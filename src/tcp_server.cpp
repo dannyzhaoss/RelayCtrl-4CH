@@ -5,8 +5,8 @@
 
 // TCP服务器处理 - 支持原始TCP控制和Modbus TCP
 
-// TCP服务器配置
-#define MAX_CLIENTS 4
+// TCP服务器配置 - 降低并发连接数以节省内存
+#define MAX_CLIENTS 2  // 从4减少到2，节省内存
 
 // 使用全局声明的服务器对象（在main.cpp中定义）
 WiFiClient clients[MAX_CLIENTS];

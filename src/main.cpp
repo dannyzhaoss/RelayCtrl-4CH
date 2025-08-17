@@ -356,11 +356,11 @@ void loadConfig() {
   config.rawTcpPort = RAW_TCP_PORT;       // 使用默认原始TCP端口
   config.modbusTcpPort = MODBUS_TCP_PORT; // 使用默认Modbus TCP端口
   
-  // 设置默认协议状态
-  config.mqttEnabled = true;
-  config.tcpEnabled = true;
-  config.modbusTcpEnabled = true;
-  config.webAuthEnabled = false;
+  // 设置默认协议状态 - 所有服务默认关闭，用户按需开启
+  config.mqttEnabled = false;      // 默认关闭MQTT
+  config.tcpEnabled = false;       // 默认关闭TCP
+  config.modbusTcpEnabled = false; // 默认关闭Modbus TCP
+  config.webAuthEnabled = false;   // 默认关闭Web认证
   
   // 设置默认认证信息
   strcpy(config.webUsername, "admin");
@@ -387,10 +387,10 @@ void setDefaultConfig() {
   strcpy(config.webPassword, "admin");    // 默认Web密码
   config.rawTcpPort = RAW_TCP_PORT;       // 默认原始TCP端口
   config.modbusTcpPort = MODBUS_TCP_PORT; // 默认Modbus TCP端口
-  config.mqttEnabled = true;      // 默认启用MQTT
-  config.tcpEnabled = true;       // 默认启用TCP
-  config.modbusTcpEnabled = true; // 默认启用Modbus TCP
-  config.webAuthEnabled = false;  // 默认关闭Web认证
+  config.mqttEnabled = false;      // 默认关闭MQTT - 用户按需开启
+  config.tcpEnabled = false;       // 默认关闭TCP - 用户按需开启
+  config.modbusTcpEnabled = false; // 默认关闭Modbus TCP - 用户按需开启
+  config.webAuthEnabled = false;   // 默认关闭Web认证
   config.valid = true;
   
   saveConfig();

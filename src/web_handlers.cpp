@@ -1,5 +1,58 @@
 #include "config.h"
 #include "relay_controller.h"
+
+// 将CSS样式存储在Flash中以节省RAM
+const char CSS_STYLES[] PROGMEM = R"(
+body{font-family:'Roboto',Arial,sans-serif;margin:0;background:#f4f4f4;color:#333}
+.header{background:#305680;color:white;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+.header h1{margin:0;font-size:24px;font-weight:300;text-align:center}
+.nav-bar{background:white;padding:10px 20px;margin-bottom:20px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+.nav-bar a{color:#305680;text-decoration:none;margin-right:20px;font-weight:500}
+.nav-bar a.active{color:#1976d2;font-weight:600}
+.nav-bar a:hover{color:#1976d2}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin:20px 0}
+.card{background:white;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.card-title{color:#305680;font-size:18px;font-weight:500;margin:0 0 15px 0;padding-bottom:8px;border-bottom:2px solid #e0e0e0}
+.relay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}
+.relay-card{background:#f8f9fa;border-radius:8px;padding:20px;border-left:5px solid #305680;text-align:center}
+.relay-title{font-size:16px;font-weight:500;margin-bottom:10px;color:#305680}
+.relay-status{font-size:14px;margin:10px 0;padding:8px;border-radius:4px;font-weight:500}
+.status-on{background:#e8f5e8;color:#2e7d32;border:1px solid #4caf50}
+.status-off{background:#fde7e7;color:#c62828;border:1px solid #f44336}
+.btn{padding:12px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:500;margin:5px;transition:all 0.3s;min-width:80px}
+.btn-on{background:#4caf50;color:white}.btn-on:hover{background:#45a049}
+.btn-off{background:#f44336;color:white}.btn-off:hover{background:#d32f2f}
+.btn-primary{background:#305680;color:white}.btn-primary:hover{background:#1976d2}
+.btn-success{background:#4caf50;color:white}.btn-success:hover{background:#45a049}
+.btn-danger{background:#f44336;color:white}.btn-danger:hover{background:#d32f2f}
+.btn-group{display:flex;gap:10px;justify-content:center}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}
+.info-item{background:#f8f9fa;padding:15px;border-radius:4px;border-left:4px solid #305680}
+.info-label{font-size:12px;color:#666;text-transform:uppercase;margin-bottom:5px}
+.info-value{font-size:16px;font-weight:500;color:#305680}
+.protocol-controls{margin-top:20px}
+.protocol-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e0e0e0}
+.protocol-item:last-child{border-bottom:none}
+.protocol-status{font-size:14px;font-weight:500}
+.status-running{color:#4caf50}
+.status-stopped{color:#f44336}
+.control-group{display:flex;gap:10px;margin-top:20px;justify-content:center}
+.switch-container{display:flex;align-items:center;margin-bottom:15px}
+.switch{position:relative;display:inline-block;width:60px;height:34px;margin-right:15px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;transition:.4s;border-radius:34px}
+.slider:before{position:absolute;content:"";height:26px;width:26px;left:4px;bottom:4px;background:white;transition:.4s;border-radius:50%}
+input:checked+.slider{background:#4caf50}
+input:checked+.slider:before{transform:translateX(26px)}
+.form-group{margin-bottom:15px}
+.form-label{display:block;font-weight:500;margin-bottom:8px;color:#555;font-size:14px}
+.form-input{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px}
+.form-input:focus{outline:none;border-color:#305680}
+.input-group{margin-left:20px;margin-top:8px}
+.input-group .form-label{margin-bottom:4px;font-size:13px;color:#666}
+.input-group .form-input{padding:8px;font-size:13px}
+)";
 #include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
@@ -20,40 +73,8 @@ void handleRoot() {
   html += "<title>" PROJECT_NAME " 控制面板</title>";
   html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   html += "<style>";
-  // ThingsBoard风格CSS
-  html += "body{font-family:'Roboto',Arial,sans-serif;margin:0;background:#f4f4f4;color:#333}";
-  html += ".header{background:#305680;color:white;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
-  html += ".header h1{margin:0;font-size:24px;font-weight:300;text-align:center}";
-  html += ".nav-bar{background:white;padding:10px 20px;margin-bottom:20px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
-  html += ".nav-bar a{color:#305680;text-decoration:none;margin-right:20px;font-weight:500}";
-  html += ".nav-bar a.active{color:#1976d2;font-weight:600}";
-  html += ".nav-bar a:hover{color:#1976d2}";
-  html += ".container{max-width:1200px;margin:0 auto;padding:20px}";
-  html += ".dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin:20px 0}";
-  html += ".card{background:white;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}";
-  html += ".card-title{color:#305680;font-size:18px;font-weight:500;margin:0 0 15px 0;padding-bottom:8px;border-bottom:2px solid #e0e0e0}";
-  html += ".relay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}";
-  html += ".relay-card{background:#f8f9fa;border-radius:8px;padding:20px;border-left:5px solid #305680;text-align:center}";
-  html += ".relay-title{font-size:16px;font-weight:500;margin-bottom:10px;color:#305680}";
-  html += ".relay-status{font-size:14px;margin:10px 0;padding:8px;border-radius:4px;font-weight:500}";
-  html += ".status-on{background:#e8f5e8;color:#2e7d32;border:1px solid #4caf50}";
-  html += ".status-off{background:#fde7e7;color:#c62828;border:1px solid #f44336}";
-  html += ".btn{padding:12px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:500;margin:5px;transition:all 0.3s;min-width:80px}";
-  html += ".btn-on{background:#4caf50;color:white}.btn-on:hover{background:#45a049}";
-  html += ".btn-off{background:#f44336;color:white}.btn-off:hover{background:#d32f2f}";
-  html += ".btn-primary{background:#305680;color:white}.btn-primary:hover{background:#1976d2}";
-  html += ".btn-group{display:flex;gap:10px;justify-content:center}";
-  html += ".info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}";
-  html += ".info-item{background:#f8f9fa;padding:15px;border-radius:4px;border-left:4px solid #305680}";
-  html += ".info-label{font-size:12px;color:#666;text-transform:uppercase;margin-bottom:5px}";
-  html += ".info-value{font-size:16px;font-weight:500;color:#305680}";
-  html += ".protocol-controls{margin-top:20px}";
-  html += ".protocol-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e0e0e0}";
-  html += ".protocol-item:last-child{border-bottom:none}";
-  html += ".protocol-status{font-size:14px;font-weight:500}";
-  html += ".status-running{color:#4caf50}";
-  html += ".status-stopped{color:#f44336}";
-  html += ".control-group{display:flex;gap:10px;margin-top:20px;justify-content:center}";
+  // 使用PROGMEM中的CSS样式以节省RAM
+  html += FPSTR(CSS_STYLES);
   html += "</style></head>";
   
   html += "<body>";
@@ -105,12 +126,12 @@ void handleRoot() {
   html += "<button id=\"mqttBtn\" class=\"btn btn-primary\" onclick=\"toggleProtocol('mqtt')\">-</button></div>";
   html += "</div>";
   html += "<div class=\"protocol-item\">";
-  html += "<span>原始TCP (端口 8080)</span>";
+  html += "<span>原始TCP (端口 " + String(config.rawTcpPort) + ")</span>";
   html += "<div><span id=\"tcpStatusText\" class=\"protocol-status\">-</span>";
   html += "<button id=\"tcpBtn\" class=\"btn btn-primary\" onclick=\"toggleProtocol('tcp')\">-</button></div>";
   html += "</div>";
   html += "<div class=\"protocol-item\">";
-  html += "<span>Modbus TCP (端口 502)</span>";
+  html += "<span>Modbus TCP (端口 " + String(config.modbusTcpPort) + ")</span>";
   html += "<div><span id=\"modbusTcpStatusText\" class=\"protocol-status\">-</span>";
   html += "<button id=\"modbusTcpBtn\" class=\"btn btn-primary\" onclick=\"toggleProtocol('modbusTcp')\">-</button></div>";
   html += "</div></div></div>";
@@ -305,41 +326,8 @@ void handleConfigPage() {
   html += "<title>" PROJECT_NAME " 系统配置</title>";
   html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   html += "<style>";
-  // 使用与主页相同的简化CSS样式
-  html += "body{font-family:'Roboto',Arial,sans-serif;margin:0;background:#f4f4f4;color:#333}";
-  html += ".header{background:#305680;color:white;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
-  html += ".header h1{margin:0;font-size:24px;font-weight:300;text-align:center}";
-  html += ".nav-bar{background:white;padding:10px 20px;margin-bottom:20px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
-  html += ".nav-bar a{color:#305680;text-decoration:none;margin-right:20px;font-weight:500}";
-  html += ".nav-bar a.active{color:#1976d2;font-weight:600}";
-  html += ".nav-bar a:hover{color:#1976d2}";
-  html += ".container{max-width:1200px;margin:0 auto;padding:20px}";
-  html += ".dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin:20px 0}";
-  html += ".card{background:white;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}";
-  html += ".card-title{color:#305680;font-size:18px;font-weight:500;margin:0 0 15px 0;padding-bottom:8px;border-bottom:2px solid #e0e0e0}";
-  html += ".form-group{margin-bottom:15px}";
-  html += ".form-label{display:block;font-weight:500;margin-bottom:8px;color:#555;font-size:14px}";
-  html += ".form-input{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px}";
-  html += ".form-input:focus{outline:none;border-color:#305680}";
-  html += ".input-group{margin-left:20px;margin-top:8px}";
-  html += ".input-group .form-label{margin-bottom:4px;font-size:13px;color:#666}";
-  html += ".input-group .form-input{padding:8px;font-size:13px}";
-  html += ".btn{padding:12px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:500;margin:5px;transition:all 0.3s;min-width:80px}";
-  html += ".btn-primary{background:#305680;color:white}.btn-primary:hover{background:#1976d2}";
-  html += ".btn-success{background:#4caf50;color:white}.btn-success:hover{background:#45a049}";
-  html += ".btn-danger{background:#f44336;color:white}.btn-danger:hover{background:#d32f2f}";
-  html += ".btn-group{display:flex;gap:10px;justify-content:center}";
-  html += ".info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}";
-  html += ".info-item{background:#f8f9fa;padding:15px;border-radius:4px;border-left:4px solid #305680}";
-  html += ".info-label{font-size:12px;color:#666;text-transform:uppercase;margin-bottom:5px}";
-  html += ".info-value{font-size:16px;font-weight:500;color:#305680}";
-  html += ".switch-container{display:flex;align-items:center;gap:10px}";
-  html += ".switch{position:relative;display:inline-block;width:50px;height:28px}";
-  html += ".switch input{opacity:0;width:0;height:0}";
-  html += ".slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:28px}";
-  html += ".slider:before{position:absolute;content:'';height:20px;width:20px;left:4px;bottom:4px;background-color:white;transition:.4s;border-radius:50%}";
-  html += "input:checked + .slider{background-color:#305680}";
-  html += "input:checked + .slider:before{transform:translateX(22px)}";
+  // 使用PROGMEM中的CSS样式以节省RAM
+  html += FPSTR(CSS_STYLES);
   html += "</style></head>";
   
   html += "<body>";
@@ -439,6 +427,7 @@ void handleConfigPage() {
   // 网络服务配置卡片
   html += "<div class=\"card\">";
   html += "<div class=\"card-title\">网络服务</div>";
+  html += "<p style=\"color:#666;font-size:14px;margin-bottom:15px;\">💡 <strong>提示:</strong> 所有网络服务默认关闭以优化性能，请根据实际需求启用相应服务。</p>";
   html += "<form method=\"POST\" action=\"/saveServices\">";
   html += "<div class=\"form-group\">";
   html += "<div class=\"switch-container\">";
