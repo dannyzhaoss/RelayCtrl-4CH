@@ -360,7 +360,7 @@ void loadConfig() {
   config.mqttEnabled = false;      // 默认关闭MQTT
   config.tcpEnabled = false;       // 默认关闭TCP
   config.modbusTcpEnabled = false; // 默认关闭Modbus TCP
-  config.webAuthEnabled = false;   // 默认关闭Web认证
+  config.webAuthEnabled = true;    // 默认开启Web认证 - 提高安全性
   
   // 设置默认认证信息
   strcpy(config.webUsername, "admin");
@@ -390,7 +390,7 @@ void setDefaultConfig() {
   config.mqttEnabled = false;      // 默认关闭MQTT - 用户按需开启
   config.tcpEnabled = false;       // 默认关闭TCP - 用户按需开启
   config.modbusTcpEnabled = false; // 默认关闭Modbus TCP - 用户按需开启
-  config.webAuthEnabled = false;   // 默认关闭Web认证
+  config.webAuthEnabled = true;    // 默认开启Web认证 - 提高安全性
   config.valid = true;
   
   saveConfig();
