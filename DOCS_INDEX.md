@@ -1,11 +1,11 @@
-# RelayCtrl-4CH 文档索引
+# RelayCtrl-4CH 文档索引 v1.0.1
 
 ## 📖 文档导航
 
-本项目提供完整的技术文档体系，涵盖从入门到专业的各个层面。请根据您的需求选择相应的文档：
+本项目提供完整的技术文档体系，涵盖从入门到专业的各个层面。v1.0.1版本新增多个专业文档，请根据您的需求选择相应的文档：
 
 ### 🚀 快速开始
-- **[项目概述 (README.md)](README.md)** - 项目介绍、核心特性、快速开始指南
+- **[项目概述 (README.md)](README.md)** - 项目介绍、v1.0.1新特性、快速开始指南
 - **[部署指南 (DEPLOYMENT_GUIDE.md)](DEPLOYMENT_GUIDE.md)** - 详细的硬件连接和软件部署流程
 
 ### 📋 使用手册
@@ -13,21 +13,25 @@
 - **[测试指南 (TESTING_GUIDE.md)](TESTING_GUIDE.md)** - 全面的功能测试、性能测试和故障排除
 
 ### 🔧 技术参考
-- **[项目状态报告 (PROJECT_STATUS.md)](PROJECT_STATUS.md)** - 技术规格、资源使用、交付清单
+- **[项目状态报告 (PROJECT_STATUS.md)](PROJECT_STATUS.md)** - v1.0.1技术规格、资源使用、交付清单
 - **[RS485命令参考 (RS485_Commands.md)](RS485_Commands.md)** - Modbus RTU协议和串口命令详解
-- **[Modbus TCP命令参考 (MODBUS_TCP_COMMANDS.md)](MODBUS_TCP_COMMANDS.md)** - Modbus TCP协议命令快速参考
+- **[Modbus TCP命令参考 (MODBUS_TCP_COMMANDS.md)](MODBUS_TCP_COMMANDS.md)** - Modbus TCP协议命令快速参考 🆕
 - **[升级说明 (UPGRADE_NOTES.md)](UPGRADE_NOTES.md)** - 版本更新内容和升级指导
 
 ### 📊 项目档案
 - **[项目总结 (PROJECT_SUMMARY.md)](PROJECT_SUMMARY.md)** - 完整的项目回顾、技术成就和经验总结
+- **[版本更新日志 (CHANGELOG_v1.0.1.md)](CHANGELOG_v1.0.1.md)** - v1.0.1详细更新记录 🆕
+- **[固件更新指南 (FIRMWARE_UPDATE_v1.0.1.md)](FIRMWARE_UPDATE_v1.0.1.md)** - v1.0.1固件升级说明 🆕
+- **[Web界面更改 (WEB_MODIFICATION_SUMMARY.md)](WEB_MODIFICATION_SUMMARY.md)** - Web界面优化摘要 🆕
 - **[编译配置 (platformio.ini)](platformio.ini)** - PlatformIO项目配置文件
 
-## 📚 文档特色
+## 📚 文档特色 (v1.0.1)
 
-### 完整性
-- **覆盖全面**: 从硬件连接到软件配置的完整流程
-- **细节丰富**: 超过2万字的详细技术说明
-- **示例丰富**: 大量代码示例和实际操作演示
+### 完整性升级
+- **覆盖全面**: 从硬件连接到Modbus调试的完整流程
+- **细节丰富**: 超过3万字的详细技术说明 (新增1万字)
+- **示例丰富**: 大量代码示例和Modbus通信演示
+- **问题解决**: 包含常见问题和调试方法 🆕
 
 ### 实用性
 - **即插即用**: 提供可直接运行的脚本和命令

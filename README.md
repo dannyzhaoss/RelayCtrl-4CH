@@ -1,15 +1,24 @@
 # ESP8266 RelayCtrl-4CH 四路继电器控制器
 
-![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.0.1-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-ESP8266-green.svg)
 ![Framework](https://img.shields.io/badge/framework-Arduino-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
+![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
+![Modbus](https://img.shields.io/badge/Modbus-RTU%2FTCP-blue.svg)
 
-基于ESP8266的专业级四路继电器控制系统，支持HTTP、TCP、MQTT、Modbus等多种工业通信协议。
+基于ESP8266的专业级四路继电器控制系统，支持HTTP、TCP、MQTT、Modbus RTU/TCP等多种工业通信协议。
 
 ## 🚀 项目概述
 
-RelayCtrl-4CH是一个功能完整的工业级继电器控制解决方案，采用ESP8266 NodeMCU开发板，提供稳定可靠的远程继电器控制功能。项目经过完整的优化和测试，内存使用率控制在61.7%，Flash使用率52.6%，具备良好的性能表现。
+RelayCtrl-4CH是一个功能完整的工业级继电器控制解决方案，采用ESP8266 NodeMCU开发板，提供稳定可靠的远程继电器控制功能。
+
+### 📊 系统性能指标 (v1.0.1)
+- **内存使用**: 63.7% (52188/81920 bytes)
+- **Flash使用**: 52.7% (550223/1044464 bytes)  
+- **编译状态**: ✅ 成功构建
+- **运行稳定性**: ✅ 24/7连续运行
+- **通信协议**: ✅ 6种协议全部正常
 
 ## ✨ 核心特性
 
@@ -23,15 +32,17 @@ RelayCtrl-4CH是一个功能完整的工业级继电器控制解决方案，采�
 - **HTTP API**: RESTful接口，JSON数据格式
 - **TCP原始协议**: 自定义端口，高速数据传输  
 - **MQTT协议**: 物联网标准，支持订阅/发布
-- **Modbus RTU**: 串口工业协议
-- **Modbus TCP**: 网络工业协议
+- **Modbus RTU**: 串口工业协议，支持动态从机ID配置
+- **Modbus TCP**: 网络工业协议，支持Unit ID验证
+- **调试监控**: 30秒英文心跳输出，实时系统状态
 
 ### 🖥️ Web管理
 - **响应式界面**: 支持手机、平板、电脑访问
-- **全中文本地化**: 完整的中文用户界面
+- **统一配置管理**: 优化的设置界面，避免重复配置
 - **实时监控**: 继电器状态实时显示
 - **集成升级**: 在线固件升级，支持进度显示
 - **安全认证**: Web访问权限控制
+- **服务管理**: 网络服务统一配置入口
 
 ### ⚙️ 智能配置
 - **WiFiManager配网**: 自动WiFi配置向导
