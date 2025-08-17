@@ -8,43 +8,7 @@
 #include <SoftwareSerial.h>
 #include <WiFiServer.h>
 #include <WiFiClient.h>
-
-// 继电器引脚定义 (JDQ0-3)
-#define RELAY1_PIN 12  // D6 - JDQ0
-#define RELAY2_PIN 13  // D7 - JDQ1  
-#define RELAY3_PIN 14  // D5 - JDQ2
-#define RELAY4_PIN 16  // D0 - JDQ3
-
-// 串口引脚定义
-#define DEBUG_RX 3   // RXD0
-#define DEBUG_TX 1   // TXD0
-#define RS485_RX 4  // D2 - RS485 RX (GPIO4)
-#define RS485_TX 5  // D1 - RS485 TX (GPIO5)
-// RS485模块自动控制方向，无需DE/RE管脚
-
-// 网络配置
-#define DEFAULT_SSID "SSKJ-4"
-#define DEFAULT_PASSWORD "xszn486020zcs"
-#define AP_NAME "ESP8266-RelayCtrl"
-#define AP_PASSWORD "12345678"
-
-// MQTT配置
-#define MQTT_BROKER "192.168.1.100"
-#define MQTT_PORT 1883
-#define MQTT_CLIENT_ID "ESP8266_RelayCtrl"
-#define MQTT_TOPIC_BASE "relay/"
-
-// Modbus配置
-#define MODBUS_SLAVE_ID 1
-#define MODBUS_BAUD 9600
-
-// EEPROM地址定义
-#define EEPROM_SIZE 512
-#define WIFI_SSID_ADDR 0
-#define WIFI_PASS_ADDR 64
-#define MQTT_SERVER_ADDR 128
-#define MQTT_PORT_ADDR 192
-#define DEVICE_ID_ADDR 196
+#include "config.h"  // 引入统一配置文件
 
 // 配置结构体
 struct RelayConfig {
@@ -52,6 +16,8 @@ struct RelayConfig {
   char password[64];
   char mqttServer[64];
   int mqttPort;
+  char mqttTopic[64];    // MQTT主题路径
+  char mqttApiKey[64];   // API密钥
   char deviceId[32];
   bool mqttEnabled;     // MQTT协议启用状态
   bool tcpEnabled;      // 原始TCP协议启用状态
@@ -68,6 +34,7 @@ extern SoftwareSerial rs485Serial;
 extern ModbusMaster modbus;
 extern unsigned long lastMqttReconnect;
 extern unsigned long lastHeartbeat;
+extern String dynamicMqttClientId;
 
 // TCP服务器对象
 extern WiFiServer modbusServer;
@@ -75,6 +42,9 @@ extern WiFiServer rawTcpServer;
 
 // Web服务器处理函数
 void handleRoot();
+void handleLogin();       // 新增：登录页面
+void handleLogout();      // 新增：注销处理
+void handleConfigPage();  // 新增：配置页面
 void handleStatus();
 void handleRelayControl();
 void handleGetConfig();

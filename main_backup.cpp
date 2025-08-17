@@ -8,11 +8,47 @@
 #include <ModbusMaster.h>
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
-#include "config.h"
 #include "relay_controller.h"
 
+// 继电器引脚定义 (JDQ0-3)
+#define RELAY1_PIN 12  // D6 - JDQ0
+#define RELAY2_PIN 13  // D7 - JDQ1  
+#define RELAY3_PIN 14  // D5 - JDQ2
+#define RELAY4_PIN 16  // D0 - JDQ3
+
+// 串口引脚定义
+#define DEBUG_RX 3   // RXD0
+#define DEBUG_TX 1   // TXD0
+#define RS485_RX 4  // D2 - RS485 RX (GPIO4)
+#define RS485_TX 5  // D1 - RS485 TX (GPIO5)
+// RS485模块自动控制方向，无需DE/RE管脚
+
+// 网络配置
+#define DEFAULT_SSID "SSKJ-4G"
+#define DEFAULT_PASSWORD "xszn486020zcs"
+#define AP_NAME "ESP8266-RelayCtrl"
+#define AP_PASSWORD "12345678"
+
+// MQTT配置
+#define MQTT_BROKER "192.168.1.100"
+#define MQTT_PORT 1883
+#define MQTT_CLIENT_ID "ESP8266_RelayCtrl"
+#define MQTT_TOPIC_BASE "relay/"
+
+// Modbus配置
+#define MODBUS_SLAVE_ID 1
+#define MODBUS_BAUD 9600
+
+// EEPROM地址定义
+#define EEPROM_SIZE 512
+#define WIFI_SSID_ADDR 0
+#define WIFI_PASS_ADDR 64
+#define MQTT_SERVER_ADDR 128
+#define MQTT_PORT_ADDR 192
+#define DEVICE_ID_ADDR 196
+
 // 全局对象
-ESP8266WebServer server(HTTP_PORT);
+ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdater;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -20,44 +56,28 @@ SoftwareSerial rs485Serial(RS485_RX, RS485_TX);
 ModbusMaster modbus;
 
 // TCP服务器对象
-WiFiServer modbusServer(MODBUS_TCP_PORT);  // Modbus TCP端口
-WiFiServer rawTcpServer(RAW_TCP_PORT); // 原始TCP端口
+WiFiServer modbusServer(502);  // Modbus TCP端口
+WiFiServer rawTcpServer(8080); // 原始TCP端口
 
 // 全局变量
 bool relayStates[4] = {false, false, false, false};
-String deviceId = DEFAULT_DEVICE_ID;
+String deviceId = "ESP8266_001";
 String mqttServer = MQTT_BROKER;
 int mqttPort = MQTT_PORT;
 unsigned long lastMqttReconnect = 0;
 unsigned long lastHeartbeat = 0;
-String dynamicAPName;  // 动态生成的AP名称
-String dynamicMqttClientId;  // 动态生成的MQTT客户端ID
 
 RelayConfig config;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n=== " PROJECT_NAME " 4-Channel Relay Controller ===");
-  Serial.println("Version: " FIRMWARE_VERSION);
-  Serial.println("Device: " DEVICE_TYPE);
-  
-  // 生成动态AP名称（包含MAC后四位）
-  String mac = WiFi.macAddress();
-  String macSuffix = mac.substring(12, 14) + mac.substring(15, 17);  // 获取后四位，跳过冒号
-  dynamicAPName = PROJECT_NAME "-" + macSuffix;
-  dynamicMqttClientId = PROJECT_NAME "-" + macSuffix;
-  Serial.print("Dynamic AP Name: ");
-  Serial.println(dynamicAPName);
-  Serial.print("Dynamic MQTT Client ID: ");
-  Serial.println(dynamicMqttClientId);
+  Serial.println("\n=== ESP8266 4-Channel Relay Controller ===");
+  Serial.println("Version: 1.0.0");
+  Serial.println("Device: JDQ0-3 Relay Control");
   
   // 初始化EEPROM
   EEPROM.begin(EEPROM_SIZE);
   loadConfig();
-  
-  // 更新设备ID为动态生成的值
-  strcpy(config.deviceId, dynamicMqttClientId.c_str());
-  saveConfig();
   
   // 初始化继电器引脚
   initRelays();
@@ -75,7 +95,7 @@ void setup() {
   initTcpServers();
   
   // 初始化mDNS
-  if (MDNS.begin("relayctrl")) {
+  if (MDNS.begin("esp8266-relay")) {
     Serial.println("mDNS responder started");
     MDNS.addService("http", "tcp", 80);
   }
@@ -197,7 +217,7 @@ void initWiFi() {
   WiFiManager wifiManager;
   wifiManager.setAPStaticIPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
   
-  // 首先尝试连接默认WiFi (SSKJ-4)
+  // 首先尝试连接默认WiFi (SSKJ-4G)
   WiFi.begin(DEFAULT_SSID, DEFAULT_PASSWORD);
   Serial.print("Connecting to default WiFi: ");
   Serial.println(DEFAULT_SSID);
@@ -271,31 +291,16 @@ void initWiFi() {
     Serial.println(")");
     
     Serial.println("Starting AP mode...");
-    Serial.print("Please connect to ");
-    Serial.print(dynamicAPName);
-    Serial.println(" hotspot and configure WiFi");
-    wifiManager.autoConnect(dynamicAPName.c_str(), AP_PASSWORD);
+    Serial.println("Please connect to ESP8266-RelayCtrl hotspot and configure WiFi");
+    wifiManager.autoConnect(AP_NAME, AP_PASSWORD);
   }
 }
 
 void initWebServer() {
   Serial.println("Initializing web server...");
   
-  // 认证相关路由
-  server.on("/login", HTTP_GET, handleLogin);
-  server.on("/login", HTTP_POST, handleLogin);
-  server.on("/logout", HTTP_POST, handleLogout);
-  
   // 主页
   server.on("/", handleRoot);
-  
-  // 配置页面
-  server.on("/config", handleConfigPage);
-  
-  // Favicon处理
-  server.on("/favicon.ico", []() {
-    server.send(204); // No Content
-  });
   
   // API端点
   server.on("/api/status", handleStatus);
@@ -396,9 +401,7 @@ void setDefaultConfig() {
   strcpy(config.password, DEFAULT_PASSWORD);
   strcpy(config.mqttServer, MQTT_BROKER);
   config.mqttPort = MQTT_PORT;
-  strcpy(config.mqttTopic, "/api/device");     // 默认API路径
-  strcpy(config.mqttApiKey, "");               // 默认无API密钥
-  strcpy(config.deviceId, DEFAULT_DEVICE_ID);
+  strcpy(config.deviceId, "ESP8266_001");
   config.mqttEnabled = true;      // 默认启用MQTT
   config.tcpEnabled = true;       // 默认启用TCP
   config.modbusTcpEnabled = true; // 默认启用Modbus TCP

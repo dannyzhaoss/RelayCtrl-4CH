@@ -1,3 +1,4 @@
+#include "config.h"
 #include "relay_controller.h"
 #include <ArduinoJson.h>
 
@@ -9,8 +10,10 @@ void reconnectMQTT() {
   
   lastMqttReconnect = millis();
   
-  if (mqttClient.connect(config.deviceId)) {
+  if (mqttClient.connect(dynamicMqttClientId.c_str())) {
     Serial.println("MQTT connected");
+    Serial.print("Client ID: ");
+    Serial.println(dynamicMqttClientId);
     
     // 订阅控制主题
     String controlTopic = String(MQTT_TOPIC_BASE) + config.deviceId + "/control";

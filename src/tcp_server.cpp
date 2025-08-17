@@ -1,3 +1,4 @@
+#include "config.h"
 #include "relay_controller.h"
 #include <WiFiServer.h>
 #include <WiFiClient.h>

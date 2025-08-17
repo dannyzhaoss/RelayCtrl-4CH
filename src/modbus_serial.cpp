@@ -1,3 +1,4 @@
+#include "config.h"
 #include "relay_controller.h"
 #include <ArduinoJson.h>
 
