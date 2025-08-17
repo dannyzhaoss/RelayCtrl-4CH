@@ -22,6 +22,8 @@ struct RelayConfig {
   char deviceId[32];
   char webUsername[16];    // Web认证用户名
   char webPassword[16];    // Web认证密码
+  int rawTcpPort;          // 原始TCP端口号
+  int modbusTcpPort;       // Modbus TCP端口号
   bool mqttEnabled;        // MQTT协议启用状态
   bool tcpEnabled;         // 原始TCP协议启用状态
   bool modbusTcpEnabled;   // Modbus TCP协议启用状态
@@ -40,9 +42,9 @@ extern unsigned long lastMqttReconnect;
 extern unsigned long lastHeartbeat;
 extern String dynamicMqttClientId;
 
-// TCP服务器对象
-extern WiFiServer modbusServer;
-extern WiFiServer rawTcpServer;
+// TCP服务器对象指针
+extern WiFiServer* modbusServer;
+extern WiFiServer* rawTcpServer;
 
 // Web服务器处理函数
 void handleRoot();
@@ -88,6 +90,7 @@ void printSerialHelp();
 
 // TCP服务器处理函数
 void initTcpServers();
+void restartTcpServers(); // 新增：重启TCP服务器
 void handleTcpClients();
 void handleModbusTcpClients();
 void handleModbusTcpRequest(WiFiClient& client);

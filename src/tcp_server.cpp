@@ -6,8 +6,6 @@
 // TCP服务器处理 - 支持原始TCP控制和Modbus TCP
 
 // TCP服务器配置
-#define TCP_PORT 502        // Modbus TCP标准端口
-#define RAW_TCP_PORT 8080   // 原始TCP控制端口
 #define MAX_CLIENTS 4
 
 // 使用全局声明的服务器对象（在main.cpp中定义）
@@ -17,13 +15,31 @@ WiFiClient rawClients[MAX_CLIENTS];
 void initTcpServers() {
   Serial.println("Initializing TCP servers...");
   
-  modbusServer.begin();
-  rawTcpServer.begin();
+  // 创建TCP服务器对象使用配置中的端口号
+  if (modbusServer) {
+    modbusServer->stop();
+    delete modbusServer;
+  }
+  if (rawTcpServer) {
+    rawTcpServer->stop();
+    delete rawTcpServer;
+  }
+  
+  modbusServer = new WiFiServer(config.modbusTcpPort);
+  rawTcpServer = new WiFiServer(config.rawTcpPort);
+  
+  modbusServer->begin();
+  rawTcpServer->begin();
   
   Serial.print("Modbus TCP server started on port ");
-  Serial.println(TCP_PORT);
+  Serial.println(config.modbusTcpPort);
   Serial.print("Raw TCP server started on port ");
-  Serial.println(RAW_TCP_PORT);
+  Serial.println(config.rawTcpPort);
+}
+
+void restartTcpServers() {
+  Serial.println("Restarting TCP servers with new configuration...");
+  initTcpServers();
 }
 
 void handleTcpClients() {
@@ -32,8 +48,10 @@ void handleTcpClients() {
 }
 
 void handleModbusTcpClients() {
+  if (!modbusServer) return;
+  
   // 检查新的客户端连接
-  WiFiClient newClient = modbusServer.available();
+  WiFiClient newClient = modbusServer->accept();
   if (newClient) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
       if (!clients[i] || !clients[i].connected()) {
@@ -274,8 +292,10 @@ int processWriteMultipleCoilsTcp(uint8_t* pdu, int length, uint8_t* response) {
 }
 
 void handleRawTcpClients() {
+  if (!rawTcpServer) return;
+  
   // 检查新的客户端连接
-  WiFiClient newClient = rawTcpServer.available();
+  WiFiClient newClient = rawTcpServer->accept();
   if (newClient) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
       if (!rawClients[i] || !rawClients[i].connected()) {

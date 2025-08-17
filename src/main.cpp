@@ -19,9 +19,9 @@ PubSubClient mqttClient(wifiClient);
 SoftwareSerial rs485Serial(RS485_RX, RS485_TX);
 ModbusMaster modbus;
 
-// TCP服务器对象
-WiFiServer modbusServer(MODBUS_TCP_PORT);  // Modbus TCP端口
-WiFiServer rawTcpServer(RAW_TCP_PORT); // 原始TCP端口
+// TCP服务器对象指针 - 动态创建以支持配置的端口号
+WiFiServer* modbusServer = nullptr;
+WiFiServer* rawTcpServer = nullptr;
 
 // 全局变量
 bool relayStates[4] = {false, false, false, false};
@@ -352,6 +352,23 @@ void loadConfig() {
     config.deviceId[i] = EEPROM.read(DEVICE_ID_ADDR + i);
   }
   
+  // 设置默认端口号（如果未配置）
+  config.rawTcpPort = RAW_TCP_PORT;       // 使用默认原始TCP端口
+  config.modbusTcpPort = MODBUS_TCP_PORT; // 使用默认Modbus TCP端口
+  
+  // 设置默认协议状态
+  config.mqttEnabled = true;
+  config.tcpEnabled = true;
+  config.modbusTcpEnabled = true;
+  config.webAuthEnabled = false;
+  
+  // 设置默认认证信息
+  strcpy(config.webUsername, "admin");
+  strcpy(config.webPassword, "admin");
+  strcpy(config.mqttTopic, MQTT_TOPIC_BASE);
+  strcpy(config.mqttUsername, MQTT_USERNAME);
+  strcpy(config.mqttPassword, MQTT_PASSWORD);
+  
   config.valid = true;
   
   Serial.println("Configuration loaded successfully");
@@ -368,6 +385,8 @@ void setDefaultConfig() {
   strcpy(config.deviceId, DEFAULT_DEVICE_ID);
   strcpy(config.webUsername, "admin");    // 默认Web用户名
   strcpy(config.webPassword, "admin");    // 默认Web密码
+  config.rawTcpPort = RAW_TCP_PORT;       // 默认原始TCP端口
+  config.modbusTcpPort = MODBUS_TCP_PORT; // 默认Modbus TCP端口
   config.mqttEnabled = true;      // 默认启用MQTT
   config.tcpEnabled = true;       // 默认启用TCP
   config.modbusTcpEnabled = true; // 默认启用Modbus TCP
@@ -470,22 +489,30 @@ void stopMQTT() {
 
 void startTCP() {
   Serial.println("Starting raw TCP server...");
-  rawTcpServer.begin();
+  if (rawTcpServer) {
+    rawTcpServer->begin();
+  }
 }
 
 void stopTCP() {
   Serial.println("Stopping raw TCP server...");
-  rawTcpServer.stop();
+  if (rawTcpServer) {
+    rawTcpServer->stop();
+  }
 }
 
 void startModbusTCP() {
   Serial.println("Starting Modbus TCP server...");
-  modbusServer.begin();
+  if (modbusServer) {
+    modbusServer->begin();
+  }
 }
 
 void stopModbusTCP() {
   Serial.println("Stopping Modbus TCP server...");
-  modbusServer.stop();
+  if (modbusServer) {
+    modbusServer->stop();
+  }
 }
 
 // 简单认证检查函数
