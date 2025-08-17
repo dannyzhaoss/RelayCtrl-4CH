@@ -1,13 +1,89 @@
-# ESP8266 四路继电器控制器 (JDQ0-3)
+# RelayCtrl-4CH v2.0 🏠
 
-基于ESP8266的智能四路继电器控制系统，支持多种通信协议和控制方式。
+**联鲸科技 ESP8266 4通道继电器控制系统**
 
-## 🚀 功能特性
+> 基于ESP8266的智能继电器控制解决方案，支持多协议通信、现代化Web界面和安全认证
 
-### 硬件功能
-- **4路继电器控制**: JDQ0-3继电器，支持独立控制
-- **双串口通信**: 
-  - TXD0/RXD0: 调试串口 (115200 baud)
+![ESP8266](https://img.shields.io/badge/ESP8266-IoT-blue)
+![Arduino](https://img.shields.io/badge/Arduino-Framework-green)
+![Version](https://img.shields.io/badge/Version-v2.0-orange)
+![License](https://img.shields.io/badge/License-MIT-red)
+
+## ✨ 主要特性
+
+### 🎨 全新UI设计
+- **现代化界面**: 采用渐变背景、卡片布局和响应式设计
+- **中文本地化**: 完全中文界面，符合国内用户习惯
+- **移动端适配**: 支持手机、平板等移动设备访问
+- **标签页导航**: 控制面板、网络配置、系统信息分类管理
+
+### � 安全认证系统
+- **登录保护**: 默认用户名/密码: `admin/admin`
+- **会话管理**: 1小时自动超时，支持手动注销
+- **安全访问**: 所有功能需要认证后访问
+
+### 🌐 多协议支持
+- **HTTP REST API**: 标准RESTful接口
+- **MQTT协议**: 支持自定义服务器、端口、主题和API密钥
+- **Raw TCP**: 端口8080，支持原始TCP命令
+- **Modbus TCP**: 端口502，标准Modbus协议
+
+### 🎛️ 智能控制
+- **4路继电器**: 支持JDQ0-JDQ3独立控制
+- **实时状态**: 继电器状态实时显示和更新
+- **批量操作**: 支持全开、全关等批量控制
+- **协议切换**: 可动态启用/禁用各种通信协议
+
+## 🚀 快速开始
+
+### 硬件要求
+- ESP8266开发板 (NodeMCU/ESP-12E推荐)
+- 4路继电器模块
+- 连接线若干
+
+### 软件要求
+- PlatformIO IDE
+- Arduino Framework for ESP8266
+
+### 编译上传
+```bash
+# 克隆仓库
+git clone https://github.com/dannyzhaoss/RelayCtrl-4CH.git
+cd RelayCtrl-4CH
+
+# 编译固件
+platformio run
+
+# 上传到设备
+platformio run -t upload --upload-port COM_PORT
+```
+
+### 首次配置
+1. 设备启动后创建WiFi热点 `RelayCtrl-XXXX`
+2. 连接热点，密码: `12345678`
+3. 访问 `192.168.4.1` 配置WiFi
+4. 配置完成后设备自动连接到指定WiFi
+
+## 📱 使用指南
+
+### 访问控制面板
+1. 在浏览器中访问设备IP地址
+2. 使用账号密码登录: `admin/admin`
+3. 进入主控制界面
+
+### 控制面板功能
+- **🎛️ 控制面板**: 继电器开关控制和状态显示
+- **🌐 网络配置**: WiFi和MQTT协议参数设置
+- **⚙️ 系统信息**: 设备状态、内存使用、运行时间等
+
+### MQTT配置
+1. 在网络配置页面设置MQTT参数:
+   - HTTP服务器地址: `192.168.0.145`
+   - 端口: `80`
+   - API路径: `/api/device`
+   - API密钥: `your-api-key`
+2. 点击"更新MQTT配置"保存设置
+3. 在控制面板启用MQTT协议
   - TXD2/RXD2: Modbus RTU串口 (9600 baud)
 - **GPIO引脚映射**:
   - JDQ0 (继电器1): GPIO12 (D6)
