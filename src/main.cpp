@@ -118,8 +118,8 @@ void loop() {
     handleSerialCommands();
   }
   
-  // Modbus处理 - 每50ms
-  if (currentTime - lastModbusCheck > 50) {
+  // Modbus处理 - 每10ms处理，提高响应速度
+  if (currentTime - lastModbusCheck > 10) {
     lastModbusCheck = currentTime;
     handleModbus();
   }
@@ -276,35 +276,6 @@ void initWiFi() {
     Serial.println(" hotspot and configure WiFi");
     wifiManager.autoConnect(dynamicAPName.c_str(), AP_PASSWORD);
   }
-}
-
-void initWebServer() {
-  Serial.println("Initializing web server...");
-  
-  // 主页
-  server.on("/", handleRoot);
-  
-  // 配置页面
-  server.on("/config", handleConfigPage);
-  
-  // Favicon处理
-  server.on("/favicon.ico", []() {
-    server.send(204); // No Content
-  });
-  
-  // API端点
-  server.on("/api/status", handleStatus);
-  server.on("/api/relay", HTTP_POST, handleRelayControl);
-  server.on("/api/config", HTTP_GET, handleGetConfig);
-  server.on("/api/config", HTTP_POST, handleSetConfig);
-  server.on("/api/restart", HTTP_POST, handleRestart);
-  server.on("/api/protocol", HTTP_POST, handleProtocolControl); // 新增协议控制
-  
-  // OTA更新
-  httpUpdater.setup(&server, "/update", "admin", "admin");
-  
-  server.begin();
-  Serial.println("Web server started on port 80");
 }
 
 void initMQTT() {

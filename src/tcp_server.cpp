@@ -299,13 +299,29 @@ void handleRawTcpClients() {
         handleRawTcpCommand(rawClients[i]);
       }
     } else if (rawClients[i]) {
+      // 清理断开的连接
+      Serial.print("Cleaning up disconnected TCP client slot: ");
+      Serial.println(i);
       rawClients[i].stop();
+      rawClients[i] = WiFiClient(); // 重置客户端对象
     }
   }
 }
 
 void handleRawTcpCommand(WiFiClient& client) {
-  String command = client.readStringUntil('\n');
+  String command = "";
+  
+  // 逐字符读取，避免缓冲区问题
+  while (client.available()) {
+    char c = client.read();
+    if (c == '\n' || c == '\r') {
+      break;
+    }
+    if (c >= 32 && c <= 126) { // 只接受可打印ASCII字符
+      command += c;
+    }
+  }
+  
   command.trim();
   
   if (command.length() == 0) {
@@ -318,6 +334,9 @@ void handleRawTcpCommand(WiFiClient& client) {
   Serial.print(": ");
   Serial.println(command);
   
+  // 添加小延时避免快速命令冲突
+  delay(10);
+  
   if (command.startsWith("relay")) {
     handleTcpRelayCommand(client, command);
   } else if (command == "status") {
@@ -326,12 +345,17 @@ void handleRawTcpCommand(WiFiClient& client) {
     sendTcpHelp(client);
   } else if (command == "quit" || command == "exit") {
     client.println("Goodbye!");
+    client.flush();
+    delay(100); // 给客户端时间接收消息
     client.stop();
+    Serial.print("TCP client disconnected: ");
+    Serial.println(client.remoteIP());
     return;
   } else {
     client.println("Unknown command. Type 'help' for available commands.");
   }
   
+  client.flush(); // 确保数据发送完成
   client.print("> ");
 }
 
@@ -342,20 +366,40 @@ void handleTcpRelayCommand(WiFiClient& client, String command) {
   if (spaceIndex1 > 0 && spaceIndex2 > 0) {
     int relay = command.substring(spaceIndex1 + 1, spaceIndex2).toInt();
     String state = command.substring(spaceIndex2 + 1);
+    state.trim();
+    state.toLowerCase(); // 统一转为小写
     
     if (relay >= 1 && relay <= 4) {
-      bool relayState = (state == "on" || state == "ON" || state == "1");
+      bool relayState = (state == "on" || state == "1" || state == "true");
+      
+      // 立即设置继电器状态
       setRelay(relay - 1, relayState);
+      
+      // 确认状态变更
+      bool currentState = relayStates[relay - 1];
       
       client.print("Relay ");
       client.print(relay);
-      client.print(" set to ");
-      client.println(relayState ? "ON" : "OFF");
+      client.print(" (JDQ");
+      client.print(relay - 1);
+      client.print("): ");
+      client.println(currentState ? "ON" : "OFF");
+      
+      // 如果状态不匹配，重试一次
+      if (currentState != relayState) {
+        delay(50);
+        setRelay(relay - 1, relayState);
+        client.print("Retry - Relay ");
+        client.print(relay);
+        client.print(": ");
+        client.println(relayStates[relay - 1] ? "ON" : "OFF");
+      }
     } else {
       client.println("Invalid relay number (1-4)");
     }
   } else {
     client.println("Usage: relay <1-4> <on/off>");
+    client.println("Example: relay 1 on");
   }
 }
 

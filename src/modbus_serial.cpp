@@ -20,25 +20,26 @@ void handleModbus() {
 void processModbusRequest() {
   static uint8_t buffer[256];
   static int bufferIndex = 0;
+  static unsigned long lastReceive = 0;
   
   while (rs485Serial.available() && bufferIndex < 256) {
     buffer[bufferIndex++] = rs485Serial.read();
+    lastReceive = millis();
     
     // 简单的帧检测 - 检查是否收到完整的Modbus帧
     if (bufferIndex >= 8) { // 最小Modbus RTU帧长度
       if (validateModbusFrame(buffer, bufferIndex)) {
         processModbusFrame(buffer, bufferIndex);
         bufferIndex = 0;
-        break;
+        return; // 立即返回，不等待更多数据
       }
     }
   }
   
-  // 超时重置缓冲区
-  static unsigned long lastReceive = 0;
-  if (rs485Serial.available()) {
-    lastReceive = millis();
-  } else if (millis() - lastReceive > 100 && bufferIndex > 0) {
+  // 减少超时时间，提高响应速度
+  if (bufferIndex > 0 && millis() - lastReceive > 50) { // 从100ms减少到50ms
+    Serial.print("Modbus frame timeout, clearing buffer. Length: ");
+    Serial.println(bufferIndex);
     bufferIndex = 0; // 重置缓冲区
   }
 }
@@ -127,15 +128,24 @@ void handleWriteSingleCoil(uint8_t* buffer, int length) {
   }
   
   bool state = (value == 0xFF00);
-  setRelay(address, state);
   
-  // 回送原始请求作为响应
-  rs485Write(buffer, length);
+  Serial.print("Relay ");
+  Serial.print(address + 1);
+  Serial.print(" (JDQ");
+  Serial.print(address);
+  Serial.print("): ");
+  Serial.println(state ? "ON" : "OFF");
+  
+  // 立即设置继电器状态，无延时
+  setRelay(address, state);
   
   Serial.print("Modbus Write Single Coil - Address: ");
   Serial.print(address);
   Serial.print(", State: ");
   Serial.println(state ? "ON" : "OFF");
+  
+  // 立即回送原始请求作为响应
+  rs485Write(buffer, length);
 }
 
 void handleWriteMultipleCoils(uint8_t* buffer, int length) {
