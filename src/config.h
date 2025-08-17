@@ -23,6 +23,8 @@
 #define MQTT_BROKER "192.168.1.100"
 #define MQTT_PORT 1883
 #define MQTT_TOPIC_BASE "relay/"
+#define MQTT_USERNAME ""
+#define MQTT_PASSWORD ""
 
 // ===== Modbus配置 =====
 #define MODBUS_SLAVE_ID 1

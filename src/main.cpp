@@ -281,11 +281,6 @@ void initWiFi() {
 void initWebServer() {
   Serial.println("Initializing web server...");
   
-  // 认证相关路由
-  server.on("/login", HTTP_GET, handleLogin);
-  server.on("/login", HTTP_POST, handleLogin);
-  server.on("/logout", HTTP_POST, handleLogout);
-  
   // 主页
   server.on("/", handleRoot);
   
@@ -396,12 +391,16 @@ void setDefaultConfig() {
   strcpy(config.password, DEFAULT_PASSWORD);
   strcpy(config.mqttServer, MQTT_BROKER);
   config.mqttPort = MQTT_PORT;
-  strcpy(config.mqttTopic, "/api/device");     // 默认API路径
-  strcpy(config.mqttApiKey, "");               // 默认无API密钥
+  strcpy(config.mqttTopic, MQTT_TOPIC_BASE);
+  strcpy(config.mqttUsername, MQTT_USERNAME);
+  strcpy(config.mqttPassword, MQTT_PASSWORD);
   strcpy(config.deviceId, DEFAULT_DEVICE_ID);
+  strcpy(config.webUsername, "admin");    // 默认Web用户名
+  strcpy(config.webPassword, "admin");    // 默认Web密码
   config.mqttEnabled = true;      // 默认启用MQTT
   config.tcpEnabled = true;       // 默认启用TCP
   config.modbusTcpEnabled = true; // 默认启用Modbus TCP
+  config.webAuthEnabled = false;  // 默认关闭Web认证
   config.valid = true;
   
   saveConfig();
@@ -516,4 +515,17 @@ void startModbusTCP() {
 void stopModbusTCP() {
   Serial.println("Stopping Modbus TCP server...");
   modbusServer.stop();
+}
+
+// 简单认证检查函数
+bool checkAuthentication() {
+  if (!config.webAuthEnabled) {
+    return true;  // 如果认证未启用，直接通过
+  }
+  
+  if (!server.authenticate(config.webUsername, config.webPassword)) {
+    server.requestAuthentication();
+    return false;
+  }
+  return true;
 }

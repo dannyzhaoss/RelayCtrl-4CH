@@ -16,12 +16,16 @@ struct RelayConfig {
   char password[64];
   char mqttServer[64];
   int mqttPort;
-  char mqttTopic[64];    // MQTT主题路径
-  char mqttApiKey[64];   // API密钥
+  char mqttTopic[64];      // MQTT主题前缀
+  char mqttUsername[32];   // MQTT用户名
+  char mqttPassword[32];   // MQTT密码
   char deviceId[32];
-  bool mqttEnabled;     // MQTT协议启用状态
-  bool tcpEnabled;      // 原始TCP协议启用状态
-  bool modbusTcpEnabled; // Modbus TCP协议启用状态
+  char webUsername[16];    // Web认证用户名
+  char webPassword[16];    // Web认证密码
+  bool mqttEnabled;        // MQTT协议启用状态
+  bool tcpEnabled;         // 原始TCP协议启用状态
+  bool modbusTcpEnabled;   // Modbus TCP协议启用状态
+  bool webAuthEnabled;     // Web认证启用状态
   bool valid;
 };
 
@@ -42,8 +46,6 @@ extern WiFiServer rawTcpServer;
 
 // Web服务器处理函数
 void handleRoot();
-void handleLogin();       // 新增：登录页面
-void handleLogout();      // 新增：注销处理
 void handleConfigPage();  // 新增：配置页面
 void handleStatus();
 void handleRelayControl();
@@ -118,6 +120,7 @@ void initModbus();
 void enableMQTT(bool enable);
 void enableTCP(bool enable);
 void enableModbusTCP(bool enable);
+bool checkAuthentication();  // 新增：检查Web认证
 void stopMQTT();
 void stopTCP();
 void stopModbusTCP();
