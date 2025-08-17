@@ -13,6 +13,7 @@
 #define DEBUG_TX 1   // TXD0
 #define RS485_RX 4   // D2 - RS485 RX (GPIO4)
 #define RS485_TX 5   // D1 - RS485 TX (GPIO5)
+#define RS485_DE 2   // D4 - RS485 DE/RE (GPIO2) - 方向控制引脚
 
 // ===== 网络配置 =====
 #define DEFAULT_SSID "SSKJ-4"
@@ -32,11 +33,27 @@
 
 // ===== 存储配置 =====
 #define EEPROM_SIZE 512
-#define WIFI_SSID_ADDR 0
-#define WIFI_PASS_ADDR 64
-#define MQTT_SERVER_ADDR 128
-#define MQTT_PORT_ADDR 192
-#define DEVICE_ID_ADDR 196
+
+// EEPROM地址分配
+#define WIFI_SSID_ADDR 0          // 32字节 - WiFi网络名称
+#define WIFI_PASS_ADDR 32         // 64字节 - WiFi密码
+#define MQTT_SERVER_ADDR 96       // 64字节 - MQTT服务器地址
+#define MQTT_PORT_ADDR 160        // 2字节 - MQTT端口
+#define MQTT_TOPIC_ADDR 162       // 64字节 - MQTT主题前缀
+#define MQTT_USERNAME_ADDR 226    // 32字节 - MQTT用户名
+#define MQTT_PASSWORD_ADDR 258    // 32字节 - MQTT密码
+#define DEVICE_ID_ADDR 290        // 32字节 - 设备ID
+#define WEB_USERNAME_ADDR 322     // 16字节 - Web用户名
+#define WEB_PASSWORD_ADDR 338     // 16字节 - Web密码
+#define RAW_TCP_PORT_ADDR 354     // 2字节 - 原始TCP端口
+#define MODBUS_TCP_PORT_ADDR 356  // 2字节 - Modbus TCP端口
+#define MODBUS_SLAVE_ID_ADDR 358  // 1字节 - Modbus从机地址
+#define MODBUS_BAUD_RATE_ADDR 359 // 4字节 - Modbus波特率
+#define MQTT_ENABLED_ADDR 363     // 1字节 - MQTT启用状态
+#define TCP_ENABLED_ADDR 364      // 1字节 - TCP启用状态
+#define MODBUS_TCP_ENABLED_ADDR 365 // 1字节 - Modbus TCP启用状态
+#define WEB_AUTH_ENABLED_ADDR 366 // 1字节 - Web认证启用状态
+#define CONFIG_VALID_ADDR 511     // 1字节 - 配置有效性标志
 
 // ===== 系统信息 =====
 #define FIRMWARE_VERSION "1.0.0"

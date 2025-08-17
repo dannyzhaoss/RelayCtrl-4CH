@@ -83,11 +83,33 @@ void handleModbusTcpRequest(WiFiClient& client) {
   while (client.available() && bytesRead < 260) {
     buffer[bytesRead++] = client.read();
     
+    // 打印接收到的原始数据
+    Serial.print("TCP RX byte[");
+    Serial.print(bytesRead-1);
+    Serial.print("]: 0x");
+    Serial.println(buffer[bytesRead-1], HEX);
+    
     // 检查是否收到完整的MBAP头部
     if (bytesRead >= 6) {
       uint16_t length = (buffer[4] << 8) | buffer[5];
+      Serial.print("TCP Length field: ");
+      Serial.println(length);
+      
       if (bytesRead >= length + 6) {
         // 收到完整的Modbus TCP帧
+        Serial.print("Complete TCP frame received, total bytes: ");
+        Serial.println(bytesRead);
+        
+        // 输出完整帧的十六进制
+        Serial.print("Complete frame: ");
+        for (int i = 0; i < bytesRead; i++) {
+          Serial.print("0x");
+          if (buffer[i] < 16) Serial.print("0");
+          Serial.print(buffer[i], HEX);
+          Serial.print(" ");
+        }
+        Serial.println();
+        
         processModbusTcpFrame(client, buffer, bytesRead);
         return;
       }
@@ -106,13 +128,28 @@ void processModbusTcpFrame(WiFiClient& client, uint8_t* buffer, int length) {
   
   Serial.print("Modbus TCP - Transaction: ");
   Serial.print(transactionId);
+  Serial.print(", Protocol: ");
+  Serial.print(protocolId);
+  Serial.print(", Length: ");
+  Serial.print(frameLength);
   Serial.print(", Unit: ");
-  Serial.println(unitId);
+  Serial.print(unitId);
+  Serial.print(", Config Unit: ");
+  Serial.println(config.modbusSlaveId);
   
   if (protocolId != 0) {
-    // 不是Modbus协议
+    Serial.println("Invalid protocol ID");
     return;
   }
+  
+  // 临时禁用Unit ID检查进行测试
+  /*
+  if (unitId != config.modbusSlaveId) {
+    Serial.println("Unit ID mismatch, ignoring frame");
+    return;
+  }
+  */
+  Serial.println("Processing TCP frame (Unit ID check disabled for testing)");
   
   // 提取PDU部分
   uint8_t* pdu = buffer + 7;
@@ -235,17 +272,29 @@ int processWriteSingleCoilTcp(uint8_t* pdu, int length, uint8_t* response) {
   uint16_t address = (pdu[1] << 8) | pdu[2];
   uint16_t value = (pdu[3] << 8) | pdu[4];
   
+  Serial.print("TCP Write Single Coil - Address: ");
+  Serial.print(address);
+  Serial.print(", Value: 0x");
+  Serial.println(value, HEX);
+  
   if (address >= 4) {
+    Serial.println("Invalid address");
     response[0] = pdu[0] | 0x80;
     response[1] = 0x02;
     return 2;
   }
   
   bool state = (value == 0xFF00);
+  Serial.print("Setting relay ");
+  Serial.print(address);
+  Serial.print(" to ");
+  Serial.println(state ? "ON" : "OFF");
+  
   setRelay(address, state);
   
   // 回送原始请求
   memcpy(response, pdu, 5);
+  Serial.println("TCP Write Single Coil response sent");
   return 5;
 }
 

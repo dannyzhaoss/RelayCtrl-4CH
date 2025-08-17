@@ -26,12 +26,30 @@ void processModbusRequest() {
     buffer[bufferIndex++] = rs485Serial.read();
     lastReceive = millis();
     
+    // 打印接收到的每个字节用于调试
+    Serial.print("RX byte[");
+    Serial.print(bufferIndex-1);
+    Serial.print("]: 0x");
+    Serial.println(buffer[bufferIndex-1], HEX);
+    
     // 简单的帧检测 - 检查是否收到完整的Modbus帧
     if (bufferIndex >= 8) { // 最小Modbus RTU帧长度
+      Serial.print("Checking frame, length: ");
+      Serial.print(bufferIndex);
+      Serial.print(", slave ID: ");
+      Serial.print(buffer[0]);
+      Serial.print(", config slave ID: ");
+      Serial.println(config.modbusSlaveId);
+      
       if (validateModbusFrame(buffer, bufferIndex)) {
+        Serial.println("Frame validated, processing...");
         processModbusFrame(buffer, bufferIndex);
         bufferIndex = 0;
         return; // 立即返回，不等待更多数据
+      } else {
+        Serial.println("Frame validation failed");
+        // 重要修复：验证失败时清空缓冲区
+        bufferIndex = 0;
       }
     }
   }
@@ -40,6 +58,12 @@ void processModbusRequest() {
   if (bufferIndex > 0 && millis() - lastReceive > 50) { // 从100ms减少到50ms
     Serial.print("Modbus frame timeout, clearing buffer. Length: ");
     Serial.println(bufferIndex);
+    for (int i = 0; i < bufferIndex; i++) {
+      Serial.print("0x");
+      Serial.print(buffer[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println();
     bufferIndex = 0; // 重置缓冲区
   }
 }
@@ -48,7 +72,7 @@ bool validateModbusFrame(uint8_t* buffer, int length) {
   if (length < 8) return false;
   
   uint8_t slaveId = buffer[0];
-  if (slaveId != MODBUS_SLAVE_ID) return false;
+  if (slaveId != config.modbusSlaveId) return false;
   
   // 简单的CRC检查（这里简化处理）
   return true;
@@ -254,8 +278,10 @@ void handleWriteSingleRegister(uint8_t* buffer, int length) {
     // 写继电器状态寄存器
     setRelay(address, value != 0);
     
-  // 回送原始请求作为响应
-  rs485Write(buffer, length);    Serial.print("Modbus Write Single Register - Address: ");
+    // 回送原始请求作为响应
+    rs485Write(buffer, length);
+    
+    Serial.print("Modbus Write Single Register - Address: ");
     Serial.print(address);
     Serial.print(", Value: ");
     Serial.println(value);

@@ -35,6 +35,9 @@ String dynamicMqttClientId;  // 动态生成的MQTT客户端ID
 
 RelayConfig config;
 
+// 函数声明
+void printDebugHeartbeat();
+
 void setup() {
   Serial.begin(115200);
   Serial.println("\n=== " PROJECT_NAME " 4-Channel Relay Controller ===");
@@ -130,6 +133,13 @@ void loop() {
     sendHeartbeat();
   }
   
+  // 串口调试心跳 - 每30秒输出系统状态
+  static unsigned long lastDebugHeartbeat = 0;
+  if (currentTime - lastDebugHeartbeat > 30000) {
+    lastDebugHeartbeat = currentTime;
+    printDebugHeartbeat();
+  }
+  
   // mDNS更新 - 每次都执行，但很轻量
   MDNS.update();
   
@@ -167,9 +177,16 @@ void initSerialPorts() {
   // 调试串口已在setup()中初始化
   Serial.println("Debug serial: 115200 baud");
   
-  // RS485串口初始化（自动方向控制）
-  rs485Serial.begin(MODBUS_BAUD);
-  Serial.println("RS485 serial: 9600 baud");
+  // RS485方向控制引脚初始化
+  pinMode(RS485_DE, OUTPUT);
+  digitalWrite(RS485_DE, LOW);  // 初始设为接收模式
+  Serial.println("RS485 DE/RE pin initialized (GPIO2)");
+  
+  // RS485串口初始化
+  rs485Serial.begin(config.modbusBaudRate);
+  Serial.print("RS485 serial: ");
+  Serial.print(config.modbusBaudRate);
+  Serial.println(" baud");
 }
 
 void initWiFi() {
@@ -293,9 +310,9 @@ void initMQTT() {
 void initModbus() {
   Serial.println("Initializing Modbus...");
   
-  modbus.begin(MODBUS_SLAVE_ID, rs485Serial);
+  modbus.begin(config.modbusSlaveId, rs485Serial);
   Serial.print("Modbus slave ID: ");
-  Serial.println(MODBUS_SLAVE_ID);
+  Serial.println(config.modbusSlaveId);
 }
 
 void setRelay(int relay, bool state) {
@@ -326,48 +343,85 @@ void setRelay(int relay, bool state) {
 }
 
 void loadConfig() {
-  Serial.println("Loading configuration...");
+  Serial.println("Loading configuration from EEPROM...");
   
   // 检查配置有效性标志
-  if (EEPROM.read(EEPROM_SIZE - 1) != 0xAA) {
-    Serial.println("No valid config found, using defaults");
+  if (EEPROM.read(CONFIG_VALID_ADDR) != 0xAA) {
+    Serial.println("No valid config found in EEPROM, using defaults");
     setDefaultConfig();
+    saveConfig(); // 保存默认配置到EEPROM
     return;
   }
   
-  // 读取配置
+  // 读取WiFi配置
   for (int i = 0; i < 32; i++) {
     config.ssid[i] = EEPROM.read(WIFI_SSID_ADDR + i);
   }
   for (int i = 0; i < 64; i++) {
     config.password[i] = EEPROM.read(WIFI_PASS_ADDR + i);
   }
+  
+  // 读取MQTT配置
   for (int i = 0; i < 64; i++) {
     config.mqttServer[i] = EEPROM.read(MQTT_SERVER_ADDR + i);
   }
-  
   config.mqttPort = EEPROM.read(MQTT_PORT_ADDR) | (EEPROM.read(MQTT_PORT_ADDR + 1) << 8);
   
+  for (int i = 0; i < 64; i++) {
+    config.mqttTopic[i] = EEPROM.read(MQTT_TOPIC_ADDR + i);
+  }
+  for (int i = 0; i < 32; i++) {
+    config.mqttUsername[i] = EEPROM.read(MQTT_USERNAME_ADDR + i);
+  }
+  for (int i = 0; i < 32; i++) {
+    config.mqttPassword[i] = EEPROM.read(MQTT_PASSWORD_ADDR + i);
+  }
+  
+  // 读取设备ID
   for (int i = 0; i < 32; i++) {
     config.deviceId[i] = EEPROM.read(DEVICE_ID_ADDR + i);
   }
   
-  // 设置默认端口号（如果未配置）
-  config.rawTcpPort = RAW_TCP_PORT;       // 使用默认原始TCP端口
-  config.modbusTcpPort = MODBUS_TCP_PORT; // 使用默认Modbus TCP端口
+  // 读取Web认证配置
+  for (int i = 0; i < 16; i++) {
+    config.webUsername[i] = EEPROM.read(WEB_USERNAME_ADDR + i);
+  }
+  for (int i = 0; i < 16; i++) {
+    config.webPassword[i] = EEPROM.read(WEB_PASSWORD_ADDR + i);
+  }
   
-  // 设置默认协议状态 - 所有服务默认关闭，用户按需开启
-  config.mqttEnabled = false;      // 默认关闭MQTT
-  config.tcpEnabled = false;       // 默认关闭TCP
-  config.modbusTcpEnabled = false; // 默认关闭Modbus TCP
-  config.webAuthEnabled = true;    // 默认开启Web认证 - 提高安全性
+  // 读取端口配置
+  config.rawTcpPort = EEPROM.read(RAW_TCP_PORT_ADDR) | (EEPROM.read(RAW_TCP_PORT_ADDR + 1) << 8);
+  config.modbusTcpPort = EEPROM.read(MODBUS_TCP_PORT_ADDR) | (EEPROM.read(MODBUS_TCP_PORT_ADDR + 1) << 8);
   
-  // 设置默认认证信息
-  strcpy(config.webUsername, "admin");
-  strcpy(config.webPassword, "admin");
-  strcpy(config.mqttTopic, MQTT_TOPIC_BASE);
-  strcpy(config.mqttUsername, MQTT_USERNAME);
-  strcpy(config.mqttPassword, MQTT_PASSWORD);
+  // 读取Modbus配置
+  config.modbusSlaveId = EEPROM.read(MODBUS_SLAVE_ID_ADDR);
+  config.modbusBaudRate = EEPROM.read(MODBUS_BAUD_RATE_ADDR) | 
+                         (EEPROM.read(MODBUS_BAUD_RATE_ADDR + 1) << 8) |
+                         (EEPROM.read(MODBUS_BAUD_RATE_ADDR + 2) << 16) |
+                         (EEPROM.read(MODBUS_BAUD_RATE_ADDR + 3) << 24);
+  
+  // 读取启用状态标志
+  config.mqttEnabled = EEPROM.read(MQTT_ENABLED_ADDR) == 1;
+  config.tcpEnabled = EEPROM.read(TCP_ENABLED_ADDR) == 1;
+  config.modbusTcpEnabled = EEPROM.read(MODBUS_TCP_ENABLED_ADDR) == 1;
+  config.webAuthEnabled = EEPROM.read(WEB_AUTH_ENABLED_ADDR) == 1;
+  
+  config.valid = true;
+  
+  Serial.println("Configuration loaded from EEPROM successfully");
+  Serial.println("=== Loaded Configuration ===");
+  Serial.printf("WiFi SSID: %s\n", config.ssid);
+  Serial.printf("Device ID: %s\n", config.deviceId);
+  Serial.printf("MQTT Server: %s:%d\n", config.mqttServer, config.mqttPort);
+  Serial.printf("Modbus Slave ID: %d, Baud Rate: %d\n", config.modbusSlaveId, config.modbusBaudRate);
+  Serial.printf("Ports - Raw TCP: %d, Modbus TCP: %d\n", config.rawTcpPort, config.modbusTcpPort);
+  Serial.printf("Services - MQTT: %s, TCP: %s, Modbus TCP: %s, Web Auth: %s\n",
+                config.mqttEnabled ? "ON" : "OFF",
+                config.tcpEnabled ? "ON" : "OFF", 
+                config.modbusTcpEnabled ? "ON" : "OFF",
+                config.webAuthEnabled ? "ON" : "OFF");
+  Serial.println("============================");
   
   config.valid = true;
   
@@ -387,6 +441,8 @@ void setDefaultConfig() {
   strcpy(config.webPassword, "admin");    // 默认Web密码
   config.rawTcpPort = RAW_TCP_PORT;       // 默认原始TCP端口
   config.modbusTcpPort = MODBUS_TCP_PORT; // 默认Modbus TCP端口
+  config.modbusSlaveId = MODBUS_SLAVE_ID; // 默认Modbus从站地址
+  config.modbusBaudRate = MODBUS_BAUD;    // 默认Modbus波特率
   config.mqttEnabled = false;      // 默认关闭MQTT - 用户按需开启
   config.tcpEnabled = false;       // 默认关闭TCP - 用户按需开启
   config.modbusTcpEnabled = false; // 默认关闭Modbus TCP - 用户按需开启
@@ -397,7 +453,7 @@ void setDefaultConfig() {
 }
 
 void saveConfig() {
-  Serial.println("Saving configuration...");
+  Serial.println("Saving configuration to EEPROM...");
   
   // 写入WiFi配置
   for (int i = 0; i < 32; i++) {
@@ -414,16 +470,53 @@ void saveConfig() {
   EEPROM.write(MQTT_PORT_ADDR, config.mqttPort & 0xFF);
   EEPROM.write(MQTT_PORT_ADDR + 1, (config.mqttPort >> 8) & 0xFF);
   
+  for (int i = 0; i < 64; i++) {
+    EEPROM.write(MQTT_TOPIC_ADDR + i, config.mqttTopic[i]);
+  }
+  for (int i = 0; i < 32; i++) {
+    EEPROM.write(MQTT_USERNAME_ADDR + i, config.mqttUsername[i]);
+  }
+  for (int i = 0; i < 32; i++) {
+    EEPROM.write(MQTT_PASSWORD_ADDR + i, config.mqttPassword[i]);
+  }
+  
   // 写入设备ID
   for (int i = 0; i < 32; i++) {
     EEPROM.write(DEVICE_ID_ADDR + i, config.deviceId[i]);
   }
   
+  // 写入Web认证配置
+  for (int i = 0; i < 16; i++) {
+    EEPROM.write(WEB_USERNAME_ADDR + i, config.webUsername[i]);
+  }
+  for (int i = 0; i < 16; i++) {
+    EEPROM.write(WEB_PASSWORD_ADDR + i, config.webPassword[i]);
+  }
+  
+  // 写入端口配置
+  EEPROM.write(RAW_TCP_PORT_ADDR, config.rawTcpPort & 0xFF);
+  EEPROM.write(RAW_TCP_PORT_ADDR + 1, (config.rawTcpPort >> 8) & 0xFF);
+  EEPROM.write(MODBUS_TCP_PORT_ADDR, config.modbusTcpPort & 0xFF);
+  EEPROM.write(MODBUS_TCP_PORT_ADDR + 1, (config.modbusTcpPort >> 8) & 0xFF);
+  
+  // 写入Modbus配置
+  EEPROM.write(MODBUS_SLAVE_ID_ADDR, config.modbusSlaveId);
+  EEPROM.write(MODBUS_BAUD_RATE_ADDR, config.modbusBaudRate & 0xFF);
+  EEPROM.write(MODBUS_BAUD_RATE_ADDR + 1, (config.modbusBaudRate >> 8) & 0xFF);
+  EEPROM.write(MODBUS_BAUD_RATE_ADDR + 2, (config.modbusBaudRate >> 16) & 0xFF);
+  EEPROM.write(MODBUS_BAUD_RATE_ADDR + 3, (config.modbusBaudRate >> 24) & 0xFF);
+  
+  // 写入启用状态标志
+  EEPROM.write(MQTT_ENABLED_ADDR, config.mqttEnabled ? 1 : 0);
+  EEPROM.write(TCP_ENABLED_ADDR, config.tcpEnabled ? 1 : 0);
+  EEPROM.write(MODBUS_TCP_ENABLED_ADDR, config.modbusTcpEnabled ? 1 : 0);
+  EEPROM.write(WEB_AUTH_ENABLED_ADDR, config.webAuthEnabled ? 1 : 0);
+  
   // 写入有效性标志
-  EEPROM.write(EEPROM_SIZE - 1, 0xAA);
+  EEPROM.write(CONFIG_VALID_ADDR, 0xAA);
   
   EEPROM.commit();
-  Serial.println("Configuration saved");
+  Serial.println("Configuration saved to EEPROM successfully");
 }
 
 void printSystemInfo() {
@@ -526,4 +619,71 @@ bool checkAuthentication() {
     return false;
   }
   return true;
+}
+
+// 串口调试心跳函数
+void printDebugHeartbeat() {
+  Serial.println();
+  Serial.println("=== System Status Heartbeat ===");
+  Serial.print("Uptime: ");
+  Serial.print(millis() / 1000);
+  Serial.println(" seconds");
+  
+  // WiFi状态
+  Serial.print("WiFi: ");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("Connected (");
+    Serial.print(WiFi.SSID());
+    Serial.print(", ");
+    Serial.print(WiFi.localIP());
+    Serial.print(", ");
+    Serial.print(WiFi.RSSI());
+    Serial.println(" dBm)");
+  } else {
+    Serial.println("Disconnected");
+  }
+  
+  // 继电器状态
+  Serial.print("Relay Status: ");
+  for (int i = 0; i < 4; i++) {
+    Serial.print("JDQ");
+    Serial.print(i);
+    Serial.print("=");
+    Serial.print(relayStates[i] ? "ON" : "OFF");
+    if (i < 3) Serial.print(", ");
+  }
+  Serial.println();
+  
+  // Modbus配置
+  Serial.print("Modbus: SlaveID=");
+  Serial.print(config.modbusSlaveId);
+  Serial.print(", RTU_Baud=");
+  Serial.print(config.modbusBaudRate);
+  Serial.print(", TCP_Port=");
+  Serial.print(config.modbusTcpPort);
+  Serial.print(" (");
+  Serial.print(config.modbusTcpEnabled ? "Enabled" : "Disabled");
+  Serial.println(")");
+  
+  // 内存使用
+  Serial.print("Memory: Free=");
+  Serial.print(ESP.getFreeHeap());
+  Serial.print(" bytes, Usage=");
+  Serial.print(100 - (ESP.getFreeHeap() * 100 / 81920));
+  Serial.println("%");
+  
+  // 服务状态
+  Serial.print("Services: Web=Running");
+  if (config.mqttEnabled) {
+    Serial.print(", MQTT=");
+    Serial.print(mqttClient.connected() ? "Connected" : "Disconnected");
+  }
+  if (config.tcpEnabled) {
+    Serial.print(", TCP=Running");
+  }
+  if (config.modbusTcpEnabled) {
+    Serial.print(", ModbusTCP=Running");
+  }
+  Serial.println();
+  Serial.println("===============================");
 }

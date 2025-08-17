@@ -13,8 +13,10 @@ body{font-family:'Roboto',Arial,sans-serif;margin:0;background:#f4f4f4;color:#33
 .nav-bar a:hover{color:#1976d2}
 .container{max-width:1200px;margin:0 auto;padding:20px}
 .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin:20px 0}
-.card{background:white;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.card{background:white;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;flex-direction:column;min-height:400px}
 .card-title{color:#305680;font-size:18px;font-weight:500;margin:0 0 15px 0;padding-bottom:8px;border-bottom:2px solid #e0e0e0}
+.card-content{flex:1}
+.card-footer{margin-top:auto;padding-top:15px}
 .relay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}
 .relay-card{background:#f8f9fa;border-radius:8px;padding:20px;border-left:5px solid #305680;text-align:center}
 .relay-title{font-size:16px;font-weight:500;margin-bottom:10px;color:#305680}
@@ -71,7 +73,7 @@ void handleRoot() {
   }
   
   String html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
-  html += "<title>" PROJECT_NAME " 控制面板</title>";
+  html += "<title>RelayCtrl-4CH 控制器 V1.0 联鲸科技</title>";
   html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   html += "<style>";
   // 使用PROGMEM中的CSS样式以节省RAM
@@ -79,7 +81,7 @@ void handleRoot() {
   html += "</style></head>";
   
   html += "<body>";
-  html += "<div class=\"header\"><h1>" PROJECT_NAME " 继电器控制器</h1></div>";
+  html += "<div class=\"header\"><h1>RelayCtrl-4CH 控制器 V1.0 联鲸科技</h1></div>";
   html += "<div class=\"nav-bar\">";
   html += "<a href=\"/\" class=\"active\">控制面板</a>";
   html += "<a href=\"/config\">系统配置</a>";
@@ -114,7 +116,7 @@ void handleRoot() {
   html += "<div class=\"info-item\"><div class=\"info-label\">WiFi网络</div><div class=\"info-value\" id=\"wifiSSID\">-</div></div>";
   html += "<div class=\"info-item\"><div class=\"info-label\">运行时间</div><div class=\"info-value\" id=\"uptime\">-</div></div>";
   html += "<div class=\"info-item\"><div class=\"info-label\">可用内存</div><div class=\"info-value\" id=\"freeHeap\">-</div></div>";
-  html += "<div class=\"info-item\"><div class=\"info-label\">MQTT状态</div><div class=\"info-value\" id=\"mqttStatus\">-</div></div>";
+  html += "<div class=\"info-item\"><div class=\"info-label\">Modbus地址/Unit ID</div><div class=\"info-value\">" + String(config.modbusSlaveId) + "</div></div>";
   html += "</div></div>";
   
   // 协议控制卡片
@@ -169,7 +171,6 @@ void handleRoot() {
   html += "document.getElementById('wifiSSID').textContent=data.wifi;";
   html += "document.getElementById('uptime').textContent=Math.floor(data.uptime/60)+' min';";
   html += "document.getElementById('freeHeap').textContent=data.freeHeap+' bytes';";
-  html += "document.getElementById('mqttStatus').textContent=data.mqttConnected?'已连接':'未连接';";
   html += "updateProtocolStatus('mqtt',data.mqttEnabled);";
   html += "updateProtocolStatus('tcp',data.tcpEnabled);";
   html += "updateProtocolStatus('modbusTcp',data.modbusTcpEnabled);";
@@ -324,7 +325,7 @@ void handleConfigPage() {
   }
   
   String html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
-  html += "<title>" PROJECT_NAME " 系统配置</title>";
+  html += "<title>RelayCtrl-4CH 控制器 V1.0 联鲸科技</title>";
   html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   html += "<style>";
   // 使用PROGMEM中的CSS样式以节省RAM
@@ -332,7 +333,7 @@ void handleConfigPage() {
   html += "</style></head>";
   
   html += "<body>";
-  html += "<div class=\"header\"><h1>" PROJECT_NAME " 系统配置</h1></div>";
+  html += "<div class=\"header\"><h1>RelayCtrl-4CH 控制器 V1.0 联鲸科技</h1></div>";
   html += "<div class=\"nav-bar\">";
   html += "<a href=\"/\">控制面板</a>";
   html += "<a href=\"/config\" class=\"active\">系统配置</a>";
@@ -341,9 +342,14 @@ void handleConfigPage() {
   html += "<div class=\"container\">";
   html += "<div class=\"dashboard-grid\">";
   
-  // WiFi 配置卡片
+  // 系统信息配置卡片 (合并WiFi配置和系统信息)
   html += "<div class=\"card\">";
-  html += "<div class=\"card-title\">WiFi 网络配置</div>";
+  html += "<div class=\"card-title\">系统信息</div>";
+  html += "<div class=\"card-content\">";
+  
+  // WiFi网络配置
+  html += "<div style=\"margin-bottom:15px;\">";
+  html += "<h4 style=\"color:#305680;margin:0 0 15px 0;\">WiFi 网络配置</h4>";
   html += "<form method=\"POST\" action=\"/saveWiFi\">";
   html += "<div class=\"form-group\">";
   html += "<label class=\"form-label\">网络名称</label>";
@@ -358,10 +364,20 @@ void handleConfigPage() {
   html += "</div>";
   html += "</form>";
   html += "</div>";
+  html += "</div>";
+  
+  // 系统重置
+  html += "<div class=\"card-footer\">";
+  html += "<div class=\"btn-group\">";
+  html += "<button type=\"button\" class=\"btn btn-danger\" onclick=\"if(confirm('确定要重置为默认设置吗？')) location.href='/reset'\">重置为默认设置</button>";
+  html += "</div>";
+  html += "</div>";
+  html += "</div>";
   
   // MQTT 配置卡片
   html += "<div class=\"card\">";
   html += "<div class=\"card-title\">MQTT 协议配置</div>";
+  html += "<div class=\"card-content\">";
   html += "<form method=\"POST\" action=\"/saveMqtt\">";
   html += "<div class=\"form-group\">";
   html += "<div class=\"switch-container\">";
@@ -392,8 +408,11 @@ void handleConfigPage() {
   html += "<label class=\"form-label\">密码</label>";
   html += "<input type=\"password\" name=\"mqttPassword\" class=\"form-input\" value=\"" + String(config.mqttPassword) + "\" maxlength=\"64\">";
   html += "</div>";
+  html += "</div>";
+  html += "<div class=\"card-footer\">";
   html += "<div class=\"btn-group\">";
   html += "<button type=\"submit\" class=\"btn btn-success\">更新MQTT配置</button>";
+  html += "</div>";
   html += "</div>";
   html += "</form>";
   html += "</div>";
@@ -401,6 +420,7 @@ void handleConfigPage() {
   // Web 认证配置卡片
   html += "<div class=\"card\">";
   html += "<div class=\"card-title\">Web 访问认证</div>";
+  html += "<div class=\"card-content\">";
   html += "<p style=\"color:#666;font-size:14px;margin-bottom:15px;\">🔒 <strong>安全提示:</strong> Web访问认证默认开启以保护设备安全，建议修改默认密码。</p>";
   html += "<form method=\"POST\" action=\"/saveAuth\">";
   html += "<div class=\"form-group\">";
@@ -420,8 +440,11 @@ void handleConfigPage() {
   html += "<label class=\"form-label\">密码</label>";
   html += "<input type=\"password\" name=\"webPassword\" class=\"form-input\" value=\"" + String(config.webPassword) + "\" maxlength=\"32\">";
   html += "</div>";
+  html += "</div>";
+  html += "<div class=\"card-footer\">";
   html += "<div class=\"btn-group\">";
   html += "<button type=\"submit\" class=\"btn btn-success\">更新访问认证</button>";
+  html += "</div>";
   html += "</div>";
   html += "</form>";
   html += "</div>";
@@ -429,6 +452,7 @@ void handleConfigPage() {
   // 网络服务配置卡片
   html += "<div class=\"card\">";
   html += "<div class=\"card-title\">网络服务</div>";
+  html += "<div class=\"card-content\">";
   html += "<p style=\"color:#666;font-size:14px;margin-bottom:15px;\">💡 <strong>提示:</strong> 所有网络服务默认关闭以优化性能，请根据实际需求启用相应服务。</p>";
   html += "<form method=\"POST\" action=\"/saveServices\">";
   html += "<div class=\"form-group\">";
@@ -457,31 +481,60 @@ void handleConfigPage() {
   html += "<input type=\"number\" name=\"modbusTcpPort\" value=\"" + String(config.modbusTcpPort) + "\" min=\"1\" max=\"65535\" class=\"form-input\">";
   html += "</div>";
   html += "</div>";
+  html += "</div>";
+  html += "<div class=\"card-footer\">";
   html += "<div class=\"btn-group\">";
   html += "<button type=\"submit\" class=\"btn btn-success\">更新网络服务</button>";
+  html += "</div>";
   html += "</div>";
   html += "</form>";
   html += "</div>";
   
-  // 系统信息卡片
+  // Modbus配置卡片
   html += "<div class=\"card\">";
-  html += "<div class=\"card-title\">系统信息</div>";
-  html += "<div class=\"info-grid\">";
-  html += "<div class=\"info-item\"><div class=\"info-label\">设备ID</div><div class=\"info-value\">" + String(config.deviceId) + "</div></div>";
-  html += "<div class=\"info-item\"><div class=\"info-label\">固件版本</div><div class=\"info-value\">" + String(FIRMWARE_VERSION) + "</div></div>";
-  html += "<div class=\"info-item\"><div class=\"info-label\">MAC地址</div><div class=\"info-value\">" + WiFi.macAddress() + "</div></div>";
-  html += "<div class=\"info-item\"><div class=\"info-label\">IP地址</div><div class=\"info-value\">" + WiFi.localIP().toString() + "</div></div>";
-  html += "<div class=\"info-item\"><div class=\"info-label\">可用内存</div><div class=\"info-value\">" + String(ESP.getFreeHeap()) + " 字节</div></div>";
-  html += "<div class=\"info-item\"><div class=\"info-label\">运行时间</div><div class=\"info-value\">" + String(millis() / 60000) + " 分钟</div></div>";
+  html += "<div class=\"card-title\">Modbus配置</div>";
+  html += "<div class=\"card-content\">";
+  html += "<div style=\"margin-bottom:15px;color:#666;font-size:14px;\">";
+  html += "配置Modbus RTU和TCP通信参数，用于与上位机或其他设备通信。";
   html += "</div>";
+  html += "<form method='post' action='/saveModbus'>";
+  
+  // RTU和TCP共用的从机地址/Unit ID
+  html += "<div class=\"form-group\">";
+  html += "<label>从机地址 / Unit ID (1-247):</label>";
+  html += "<input type='number' name='modbusSlaveId' value='" + String(config.modbusSlaveId) + "' min='1' max='247' required>";
+  html += "<div class=\"help-text\">设备在Modbus网络中的唯一标识地址，RTU和TCP协议共用此设置</div>";
+  html += "</div>";
+  
+  // RTU配置分组
+  html += "<div style=\"border-left:3px solid #007bff;padding-left:15px;margin:20px 0;\">";
+  html += "<h4 style=\"margin:0 0 15px 0;color:#007bff;font-size:16px;\">📡 Modbus RTU (RS485)</h4>";
+  html += "<div class=\"form-group\">";
+  html += "<label>波特率:</label>";
+  html += "<select name='modbusBaudRate'>";
+  html += String("<option value='9600'") + (config.modbusBaudRate == 9600 ? " selected" : "") + ">9600</option>";
+  html += String("<option value='19200'") + (config.modbusBaudRate == 19200 ? " selected" : "") + ">19200</option>";
+  html += String("<option value='38400'") + (config.modbusBaudRate == 38400 ? " selected" : "") + ">38400</option>";
+  html += String("<option value='57600'") + (config.modbusBaudRate == 57600 ? " selected" : "") + ">57600</option>";
+  html += String("<option value='115200'") + (config.modbusBaudRate == 115200 ? " selected" : "") + ">115200</option>";
+  html += "</select>";
+  html += "<div class=\"help-text\">RS485通信波特率，需与主机保持一致</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "</div>";
+  html += "<div class=\"card-footer\">";
   html += "<div class=\"btn-group\">";
-  html += "<button type=\"button\" class=\"btn btn-danger\" onclick=\"if(confirm('确定要重置为默认设置吗？')) location.href='/reset'\">重置为默认设置</button>";
+  html += "<button type=\"submit\" class=\"btn btn-success\">更新Modbus配置</button>";
   html += "</div>";
+  html += "</div>";
+  html += "</form>";
   html += "</div>";
   
   // 固件升级卡片
   html += "<div class=\"card\">";
   html += "<div class=\"card-title\">固件升级</div>";
+  html += "<div class=\"card-content\">";
   html += "<div style=\"margin-bottom:15px;color:#666;font-size:14px;\">";
   html += "当前版本: <strong>" + String(FIRMWARE_VERSION) + "</strong><br>";
   html += "升级前请确保网络连接稳定，升级过程中请勿断电或重启设备。";
@@ -507,10 +560,14 @@ void handleConfigPage() {
   html += "<span style='font-size:13px;color:#666;'>勾选此项表示上传的是 FileSystem 固件</span>";
   html += "</label>";
   html += "</div>";
+  html += "</div>";
+  html += "<div class=\"card-footer\">";
   html += "<div class=\"btn-group\">";
   html += "<button type='submit' class=\"btn btn-primary\" onclick='return startUpload(event)'>开始升级</button>";
   html += "</div>";
   html += "</form>";
+  html += "</div>";
+  html += "</div>";
   
   // 进度显示区域
   html += "<div id='progressArea' style='display:none;margin-top:15px;'>";
@@ -720,6 +777,37 @@ void handleSaveServices() {
     "<script>setTimeout(function(){window.location.href='/config';}, 2000);</script></body></html>");
 }
 
+void handleSaveModbus() {
+  // 检查认证
+  if (!checkAuthentication()) {
+    return;
+  }
+  
+  // 处理Modbus从机地址/Unit ID
+  if (server.hasArg("modbusSlaveId")) {
+    int slaveId = server.arg("modbusSlaveId").toInt();
+    if (slaveId >= 1 && slaveId <= 247) {
+      config.modbusSlaveId = slaveId;
+    }
+  }
+  
+  // 处理Modbus RTU波特率
+  if (server.hasArg("modbusBaudRate")) {
+    config.modbusBaudRate = server.arg("modbusBaudRate").toInt();
+  }
+  
+  saveConfig();
+  
+  server.send(200, "text/html", 
+    "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>配置已更新</title></head><body>"
+    "<h2>Modbus RTU配置已更新</h2>"
+    "<p>从机地址/Unit ID: " + String(config.modbusSlaveId) + "</p>"
+    "<p>RTU波特率: " + String(config.modbusBaudRate) + "</p>"
+    "<p><strong>注意:</strong> Modbus TCP相关设置请在网络服务中配置</p>"
+    "<p>正在返回配置页面...</p>"
+    "<script>setTimeout(function(){window.location.href='/config';}, 3000);</script></body></html>");
+}
+
 void handleReset() {
   // 检查认证
   if (!checkAuthentication()) {
@@ -852,6 +940,7 @@ void initWebServer() {
   server.on("/saveMqtt", HTTP_POST, handleSaveMqtt);
   server.on("/saveAuth", HTTP_POST, handleSaveAuth);
   server.on("/saveServices", HTTP_POST, handleSaveServices);
+  server.on("/saveModbus", HTTP_POST, handleSaveModbus);
   server.on("/reset", handleReset);
   
   // Favicon处理

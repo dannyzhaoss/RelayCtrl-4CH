@@ -24,6 +24,8 @@ struct RelayConfig {
   char webPassword[16];    // Web认证密码
   int rawTcpPort;          // 原始TCP端口号
   int modbusTcpPort;       // Modbus TCP端口号
+  int modbusSlaveId;       // Modbus从站地址
+  int modbusBaudRate;      // Modbus串口波特率
   bool mqttEnabled;        // MQTT协议启用状态
   bool tcpEnabled;         // 原始TCP协议启用状态
   bool modbusTcpEnabled;   // Modbus TCP协议启用状态
