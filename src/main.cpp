@@ -195,6 +195,25 @@ void initSerialPorts() {
 void initWiFi() {
   Serial.println("Initializing WiFi...");
   
+  // 先扫描可用网络进行调试
+  Serial.println("Scanning WiFi networks...");
+  int n = WiFi.scanNetworks();
+  Serial.print("Found ");
+  Serial.print(n);
+  Serial.println(" networks:");
+  
+  for (int i = 0; i < n; i++) {
+    Serial.print("  ");
+    Serial.print(i + 1);
+    Serial.print(": ");
+    Serial.print(WiFi.SSID(i));
+    Serial.print(" (");
+    Serial.print(WiFi.RSSI(i));
+    Serial.print("dBm)");
+    Serial.println(WiFi.encryptionType(i) == ENC_TYPE_NONE ? " [Open]" : " [Encrypted]");
+  }
+  Serial.println();
+  
   WiFiManager wifiManager;
   wifiManager.setAPStaticIPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
   
