@@ -10,10 +10,28 @@ void reconnectMQTT() {
   
   lastMqttReconnect = millis();
   
+  // 静态变量用于错误计数和重试逻辑
+  static int connectAttempts = 0;
+  static unsigned long lastResetTime = 0;
+  
+  // 每小时重置错误计数
+  if (millis() - lastResetTime > 3600000) {
+    connectAttempts = 0;
+    lastResetTime = millis();
+  }
+  
+  // 如果连续失败次数过多，暂停MQTT重连以保护系统性能
+  if (connectAttempts > 20) {
+    Serial.println("MQTT: Cooldown 1h");
+    lastMqttReconnect = millis() + 3590000; // 延迟59分50秒后再试
+    return;
+  }
+  
   if (mqttClient.connect(dynamicMqttClientId)) {
-    Serial.println("MQTT connected");
-    Serial.print("Client ID: ");
-    Serial.println(dynamicMqttClientId);
+    Serial.printf("MQTT: Connected as %s\n", dynamicMqttClientId);
+    
+    // 重置错误计数
+    connectAttempts = 0;
     
     // 订阅控制主题
     String controlTopic = String(MQTT_TOPIC_BASE) + config.deviceId + "/control";
@@ -30,11 +48,10 @@ void reconnectMQTT() {
       publishRelayState(i, relayStates[i]);
     }
     
-    Serial.print("Subscribed to: ");
-    Serial.println(controlTopic);
+    Serial.printf("MQTT: Sub %s\n", controlTopic.c_str());
   } else {
-    Serial.print("MQTT connection failed, rc=");
-    Serial.println(mqttClient.state());
+    connectAttempts++;
+    Serial.printf("MQTT: Failed #%d (rc=%d)\n", connectAttempts, mqttClient.state());
   }
 }
 
@@ -44,10 +61,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     message += (char)payload[i];
   }
   
-  Serial.print("MQTT message received [");
-  Serial.print(topic);
-  Serial.print("]: ");
-  Serial.println(message);
+  Serial.printf("MQTT: [%s] %s\n", topic, message.c_str());
   
   String topicStr = String(topic);
   String baseTopic = String(MQTT_TOPIC_BASE) + config.deviceId;
@@ -69,10 +83,7 @@ void handleMqttControl(String message) {
     
     if (relay >= 1 && relay <= 4) {
       setRelay(relay - 1, state);
-      Serial.print("MQTT control: Relay ");
-      Serial.print(relay);
-      Serial.print(" -> ");
-      Serial.println(state ? "ON" : "OFF");
+      Serial.printf("MQTT: R%d=%s\n", relay, state ? "ON" : "OFF");
     }
   } else if (doc.containsKey("command")) {
     String command = doc["command"];
@@ -80,7 +91,7 @@ void handleMqttControl(String message) {
     if (command == "status") {
       publishSystemStatus();
     } else if (command == "restart") {
-      Serial.println("MQTT restart command received");
+      Serial.println("MQTT: Restart cmd");
       delay(1000);
       ESP.restart();
     } else if (command == "all_on") {
@@ -116,7 +127,7 @@ void handleMqttConfig(String message) {
   
   if (configChanged) {
     saveConfig();
-    Serial.println("Configuration updated via MQTT");
+    Serial.println("CONFIG: Updated via MQTT");
     
     // 发布配置更新确认
     String topic = String(MQTT_TOPIC_BASE) + config.deviceId + "/status";

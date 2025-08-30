@@ -13,7 +13,7 @@ WiFiClient clients[MAX_CLIENTS];
 WiFiClient rawClients[MAX_CLIENTS];
 
 void initTcpServers() {
-  Serial.println("Initializing TCP servers...");
+  Serial.println("TCP: Initializing servers...");
   
   // 创建TCP服务器对象使用配置中的端口号
   if (modbusServer) {
@@ -31,14 +31,12 @@ void initTcpServers() {
   modbusServer->begin();
   rawTcpServer->begin();
   
-  Serial.print("Modbus TCP server started on port ");
-  Serial.println(config.modbusTcpPort);
-  Serial.print("Raw TCP server started on port ");
-  Serial.println(config.rawTcpPort);
+  Serial.printf("TCP: Modbus server on port %d\n", config.modbusTcpPort);
+  Serial.printf("TCP: Raw server on port %d\n", config.rawTcpPort);
 }
 
 void restartTcpServers() {
-  Serial.println("Restarting TCP servers with new configuration...");
+  Serial.println("TCP: Restarting servers...");
   initTcpServers();
 }
 
@@ -48,18 +46,31 @@ void handleTcpClients() {
 }
 
 void handleModbusTcpClients() {
-  if (!modbusServer) return;
+  if (!config.modbusTcpEnabled || !modbusServer) return;
+  
+  // 限制处理频率以提高稳定性
+  static unsigned long lastProcessTime = 0;
+  if (millis() - lastProcessTime < 10) return;
+  lastProcessTime = millis();
   
   // 检查新的客户端连接
   WiFiClient newClient = modbusServer->accept();
   if (newClient) {
+    bool accepted = false;
     for (int i = 0; i < MAX_CLIENTS; i++) {
       if (!clients[i] || !clients[i].connected()) {
         clients[i] = newClient;
-        Serial.print("New Modbus TCP client connected: ");
-        Serial.println(newClient.remoteIP());
+        Serial.printf("MODBUS: Client %s slot %d\n", 
+                     newClient.remoteIP().toString().c_str(), i);
+        accepted = true;
         break;
       }
+    }
+    
+    if (!accepted) {
+      Serial.println("MODBUS: Max clients");
+      newClient.println("ERROR: Server busy");
+      newClient.stop();
     }
   }
   
@@ -67,10 +78,17 @@ void handleModbusTcpClients() {
   for (int i = 0; i < MAX_CLIENTS; i++) {
     if (clients[i] && clients[i].connected()) {
       if (clients[i].available()) {
-        handleModbusTcpRequest(clients[i]);
+        try {
+          handleModbusTcpRequest(clients[i]);
+        } catch (...) {
+          Serial.printf("MODBUS: Error client %d\n", i);
+          clients[i].stop();
+          clients[i] = WiFiClient();
+        }
       }
     } else if (clients[i]) {
       clients[i].stop();
+      clients[i] = WiFiClient(); // 重置为无效客户端
     }
   }
 }
@@ -89,7 +107,7 @@ void handleModbusTcpRequest(WiFiClient& client) {
       
       // 防止长度字段异常大
       if (length > 250 || length < 1) {
-        Serial.println("Invalid TCP frame length");
+        Serial.println("TCP: Invalid frame length");
         return;
       }
       
@@ -111,19 +129,11 @@ void processModbusTcpFrame(WiFiClient& client, uint8_t* buffer, int length) {
   uint16_t frameLength = (buffer[4] << 8) | buffer[5];
   uint8_t unitId = buffer[6];
   
-  Serial.print("Modbus TCP - Transaction: ");
-  Serial.print(transactionId);
-  Serial.print(", Protocol: ");
-  Serial.print(protocolId);
-  Serial.print(", Length: ");
-  Serial.print(frameLength);
-  Serial.print(", Unit: ");
-  Serial.print(unitId);
-  Serial.print(", Config Unit: ");
-  Serial.println(config.modbusSlaveId);
+  Serial.printf("MODBUS: Tx=%d Proto=%d Len=%d Unit=%d/%d\n", 
+               transactionId, protocolId, frameLength, unitId, config.modbusSlaveId);
   
   if (protocolId != 0) {
-    Serial.println("Invalid protocol ID");
+    Serial.println("MODBUS: Invalid protocol ID");
     return;
   }
   

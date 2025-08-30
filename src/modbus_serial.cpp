@@ -42,12 +42,9 @@ void processModbusRequest() {
   
   // 减少超时时间，提高响应速度
   if (bufferIndex > 0 && millis() - lastReceive > 50) { // 从100ms减少到50ms
-    Serial.print("Modbus frame timeout, clearing buffer. Length: ");
-    Serial.println(bufferIndex);
+    Serial.printf("MODBUS: Timeout len=%d: ", bufferIndex);
     for (int i = 0; i < bufferIndex; i++) {
-      Serial.print("0x");
-      Serial.print(buffer[i], HEX);
-      Serial.print(" ");
+      Serial.printf("%02X ", buffer[i]);
     }
     Serial.println();
     bufferIndex = 0; // 重置缓冲区
@@ -68,10 +65,7 @@ void processModbusFrame(uint8_t* buffer, int length) {
   uint8_t slaveId = buffer[0];
   uint8_t functionCode = buffer[1];
   
-  Serial.print("Modbus request - Slave: ");
-  Serial.print(slaveId);
-  Serial.print(", Function: ");
-  Serial.println(functionCode);
+  Serial.printf("MODBUS: Slave=%d Func=%d\n", slaveId, functionCode);
   
   switch (functionCode) {
     case 0x01: // Read Coils (读线圈)
@@ -124,8 +118,7 @@ void handleReadCoils(uint8_t* buffer, int length) {
   
   rs485Write(response, 6);
   
-  Serial.print("Modbus Read Coils response sent, status: 0x");
-  Serial.println(response[3], HEX);
+  Serial.printf("MODBUS: Read coils status=0x%02X\n", response[3]);
 }
 
 void handleWriteSingleCoil(uint8_t* buffer, int length) {
@@ -139,20 +132,12 @@ void handleWriteSingleCoil(uint8_t* buffer, int length) {
   
   bool state = (value == 0xFF00);
   
-  Serial.print("Relay ");
-  Serial.print(address + 1);
-  Serial.print(" (JDQ");
-  Serial.print(address);
-  Serial.print("): ");
-  Serial.println(state ? "ON" : "OFF");
+  Serial.printf("RELAY: R%d(JDQ%d)=%s\n", address + 1, address, state ? "ON" : "OFF");
   
   // 立即设置继电器状态，无延时
   setRelay(address, state);
   
-  Serial.print("Modbus Write Single Coil - Address: ");
-  Serial.print(address);
-  Serial.print(", State: ");
-  Serial.println(state ? "ON" : "OFF");
+  Serial.printf("MODBUS: Write coil addr=%d state=%s\n", address, state ? "ON" : "OFF");
   
   // 立即回送原始请求作为响应
   rs485Write(buffer, length);

@@ -58,6 +58,11 @@ void handleSetConfig();
 void handleRestart();
 void handleProtocolControl(); // 新增：协议控制处理
 
+// 系统管理函数
+void scheduleRestart(unsigned long delayMs);
+bool saveConfig();  // 返回bool以指示成功/失败
+void performHealthCheck();  // 系统健康检查
+
 // MQTT处理函数
 void reconnectMQTT();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
@@ -112,7 +117,6 @@ void sendTcpHelp(WiFiClient& client);
 void setRelay(int relay, bool state);
 void loadConfig();
 void setDefaultConfig();
-void saveConfig();
 void printSystemInfo();
 void initRelays();
 void initSerialPorts();

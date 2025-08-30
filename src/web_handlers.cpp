@@ -496,15 +496,20 @@ void handleSaveWiFi() {
     ssid.toCharArray(config.ssid, sizeof(config.ssid));
     password.toCharArray(config.password, sizeof(config.password));
     
-    saveConfig();
+    if (!saveConfig()) {
+      server.send(500, "text/html", 
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>保存失败</title></head><body>"
+        "<h2>错误: 配置保存失败</h2><p><a href='/config'>返回配置页面</a></p></body></html>");
+      return;
+    }
     
     server.send(200, "text/html", 
       "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>配置已更新</title></head><body>"
       "<h2>WiFi配置已更新</h2><p>设备将在3秒后重启...</p>"
       "<script>setTimeout(function(){window.location.href='/config';}, 3000);</script></body></html>");
     
-    delay(3000);
-    ESP.restart();
+    // 调度延迟重启而不是阻塞
+    scheduleRestart(3000);
   } else {
     server.send(400, "text/html", "<h1>错误: 缺少参数</h1>");
   }
@@ -618,15 +623,20 @@ void handleReset() {
   
   // 重置为默认配置
   setDefaultConfig();
-  saveConfig();
+  if (!saveConfig()) {
+    server.send(500, "text/html", 
+      "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>重置失败</title></head><body>"
+      "<h2>错误: 配置重置失败</h2><p><a href='/config'>返回配置页面</a></p></body></html>");
+    return;
+  }
   
   server.send(200, "text/html", 
     "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>重置完成</title></head><body>"
     "<h2>配置已重置为默认设置</h2><p>设备将在3秒后重启...</p>"
     "<script>setTimeout(function(){window.location.href='/config';}, 3000);</script></body></html>");
   
-  delay(3000);
-  ESP.restart();
+  // 调度延迟重启
+  scheduleRestart(3000);
 }
 
 void handleNotFound() {
@@ -654,13 +664,13 @@ void handleRestart() {
   }
   
   server.send(200, "application/json", "{\"success\":true,\"message\":\"设备正在重启...\"}");
-  delay(1000);
-  ESP.restart();
+  // 调度立即重启
+  scheduleRestart(1000);
 }
 
 // 初始化Web服务器
 void initWebServer() {
-  Serial.println("Initializing web server...");
+  Serial.println("WEB: Initializing server...");
   
   // 静态页面路由
   server.on("/", handleRoot);
@@ -688,5 +698,5 @@ void initWebServer() {
   server.onNotFound(handleNotFound);
   
   server.begin();
-  Serial.println("Web server started on port 80");
+  Serial.println("WEB: Server started on port 80");
 }

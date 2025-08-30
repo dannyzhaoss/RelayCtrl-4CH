@@ -6,7 +6,6 @@
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <ModbusMaster.h>
-#include <SoftwareSerial.h>
 #include <EEPROM.h>
 #include "config.h"
 #include "relay_controller.h"
@@ -33,24 +32,50 @@ unsigned long lastHeartbeat = 0;
 
 RelayConfig config;
 
+// 重启调度变量
+unsigned long restartScheduledTime = 0;
+bool restartScheduled = false;
+
+// 系统健康监控变量
+unsigned long lastHealthCheck = 0;
+unsigned int systemErrorCount = 0;
+unsigned long systemStartTime = 0;
+
 // 函数声明
 void printDebugHeartbeat();
+void performHealthCheck();
+
+void initSerialPorts() {
+  Serial.println("SERIAL: Init...");
+  
+  // 调试串口已在setup()中初始化
+  Serial.println("Debug: 115200 baud");
+  
+  // RS485方向控制引脚初始化
+  pinMode(RS485_DE, OUTPUT);
+  digitalWrite(RS485_DE, LOW);  // 初始设为接收模式
+  Serial.println("RS485_DE: GPIO2 ready");
+  
+  // RS485串口初始化
+  rs485Serial.begin(config.modbusBaudRate, SWSERIAL_8N1, RS485_RX, RS485_TX, false, 256);
+  Serial.printf("RS485: %d baud\n", config.modbusBaudRate);
+}
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n=== " PROJECT_NAME " 4-Channel Relay Controller ===");
-  Serial.println("Version: " FIRMWARE_VERSION);
-  Serial.println("Device: " DEVICE_TYPE);
+  Serial.println();
+  Serial.println("=== " PROJECT_NAME " 4CH Relay Controller ===");
+  Serial.println("FW: " FIRMWARE_VERSION " | Device: " DEVICE_TYPE);
+  
+  // 记录系统启动时间
+  systemStartTime = millis();
   
   // 生成动态AP名称（包含MAC后四位）- 优化内存使用
   String mac = WiFi.macAddress();
   String macSuffix = mac.substring(12, 14) + mac.substring(15, 17);  // 获取后四位，跳过冒号
   snprintf(dynamicAPName, sizeof(dynamicAPName), "%s-%s", PROJECT_NAME, macSuffix.c_str());
   snprintf(dynamicMqttClientId, sizeof(dynamicMqttClientId), "%s-%s", PROJECT_NAME, macSuffix.c_str());
-  Serial.print("Dynamic AP Name: ");
-  Serial.println(dynamicAPName);
-  Serial.print("Dynamic MQTT Client ID: ");
-  Serial.println(dynamicMqttClientId);
+  Serial.printf("AP: %s | MQTT_ID: %s\n", dynamicAPName, dynamicMqttClientId);
   
   // 初始化EEPROM
   EEPROM.begin(EEPROM_SIZE);
@@ -75,7 +100,7 @@ void setup() {
   
   // 设置Arduino OTA
   httpUpdater.setup(&server, "/update", config.webUsername, config.webPassword);
-  Serial.println("Arduino OTA initialized at /update");
+  Serial.println("OTA: Initialized at /update");
   
   initMQTT();
   initModbus();
@@ -83,18 +108,18 @@ void setup() {
   
   // 初始化mDNS
   if (MDNS.begin("relayctrl")) {
-    Serial.println("mDNS responder started");
+    Serial.println("mDNS: Started");
     MDNS.addService("http", "tcp", 80);
   }
   
-  Serial.println("System initialized successfully!");
+  Serial.println("INIT: Complete");
   printSystemInfo();
 }
 
 void loop() {
   // 内存保护 - 防止内存不足导致死机
   if (ESP.getFreeHeap() < 8192) {  // 小于8KB时强制垃圾回收
-    Serial.println("WARNING: Low memory detected, forcing GC");
+    Serial.println("WARN: Low memory, forcing GC");
     delay(100);
     ESP.wdtFeed();
     yield();
@@ -102,6 +127,12 @@ void loop() {
   
   // 看门狗保护
   ESP.wdtFeed();
+  
+  // 检查是否有调度的重启
+  if (restartScheduled && millis() >= restartScheduledTime) {
+    Serial.println("SYS: Restarting...");
+    ESP.restart();
+  }
   
   // 优先处理Web服务器请求
   server.handleClient();
@@ -121,7 +152,7 @@ void loop() {
     lastMemoryCheck = currentTime;
     uint32_t freeHeap = ESP.getFreeHeap();
     if (freeHeap < 12288) {  // 小于12KB时警告
-      Serial.printf("Memory Warning: %d bytes free\n", freeHeap);
+      Serial.printf("MEM: %u bytes free\n", freeHeap);
     }
   }
   
@@ -158,6 +189,12 @@ void loop() {
     sendHeartbeat();
   }
   
+  // 系统健康检查 - 每5分钟执行一次
+  if (currentTime - lastHealthCheck > 300000) {
+    lastHealthCheck = currentTime;
+    performHealthCheck();
+  }
+  
   // 串口调试心跳 - 每30秒输出系统状态
   static unsigned long lastDebugHeartbeat = 0;
   if (currentTime - lastDebugHeartbeat > 30000) {
@@ -182,7 +219,7 @@ void loop() {
 }
 
 void initRelays() {
-  Serial.println("Initializing relays...");
+  Serial.println("RELAY: Init...");
   
   // 继电器低电平吸合，所以HIGH=关闭，先设置为关闭状态避免上电瞬间动作
   pinMode(RELAY1_PIN, OUTPUT);
@@ -202,25 +239,7 @@ void initRelays() {
     setRelay(i, false);
   }
   
-  Serial.println("Relays initialized - All OFF");
-}
-
-void initSerialPorts() {
-  Serial.println("Initializing serial ports...");
-  
-  // 调试串口已在setup()中初始化
-  Serial.println("Debug serial: 115200 baud");
-  
-  // RS485方向控制引脚初始化
-  pinMode(RS485_DE, OUTPUT);
-  digitalWrite(RS485_DE, LOW);  // 初始设为接收模式
-  Serial.println("RS485 DE/RE pin initialized (GPIO2)");
-  
-  // RS485串口初始化
-  rs485Serial.begin(config.modbusBaudRate);
-  Serial.print("RS485 serial: ");
-  Serial.print(config.modbusBaudRate);
-  Serial.println(" baud");
+  Serial.println("RELAY: Ready - All OFF");
 }
 
 void initWiFi() {
@@ -350,27 +369,40 @@ void initModbus() {
 }
 
 void setRelay(int relay, bool state) {
-  if (relay < 0 || relay > 3) return;
+  // 输入验证
+  if (relay < 0 || relay > 3) {
+    Serial.printf("ERROR: Invalid relay number %d\n", relay);
+    systemErrorCount++;
+    return;
+  }
   
-  relayStates[relay] = state;
-  
+  // 检查引脚是否已初始化
   int pin;
   switch (relay) {
     case 0: pin = RELAY1_PIN; break;
     case 1: pin = RELAY2_PIN; break;
     case 2: pin = RELAY3_PIN; break;
     case 3: pin = RELAY4_PIN; break;
+    default: 
+      Serial.printf("ERROR: Unexpected relay number %d\n", relay);
+      systemErrorCount++;
+      return;
   }
+  
+  // 更新状态
+  bool previousState = relayStates[relay];
+  relayStates[relay] = state;
   
   // 继电器低电平吸合（LOW=ON, HIGH=OFF）
   digitalWrite(pin, state ? LOW : HIGH);
   
-  Serial.print("Relay ");
-  Serial.print(relay + 1);
-  Serial.print(" (JDQ");
-  Serial.print(relay);
-  Serial.print("): ");
-  Serial.println(state ? "ON" : "OFF");
+  // 验证状态变化
+  if (previousState != state) {
+    Serial.printf("Relay %d (JDQ%d): %s -> %s\n", 
+                 relay + 1, relay, 
+                 previousState ? "ON" : "OFF", 
+                 state ? "ON" : "OFF");
+  }
   
   // 发送MQTT状态更新
   publishRelayState(relay, state);
@@ -486,8 +518,8 @@ void setDefaultConfig() {
   saveConfig();
 }
 
-void saveConfig() {
-  Serial.println("Saving configuration to EEPROM...");
+bool saveConfig() {
+  Serial.println("CONFIG: Saving...");
   
   // 写入WiFi配置
   for (int i = 0; i < 32; i++) {
@@ -549,25 +581,24 @@ void saveConfig() {
   // 写入有效性标志
   EEPROM.write(CONFIG_VALID_ADDR, 0xAA);
   
-  EEPROM.commit();
-  Serial.println("Configuration saved to EEPROM successfully");
+  bool success = EEPROM.commit();
+  if (success) {
+    Serial.println("CONFIG: Saved OK");
+  } else {
+    Serial.println("ERROR: Config save failed");
+  }
+  return success;
 }
 
 void printSystemInfo() {
-  Serial.println("\n=== System Information ===");
-  Serial.print("Device ID: ");
-  Serial.println(config.deviceId);
-  Serial.print("WiFi SSID: ");
-  Serial.println(WiFi.SSID());
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("MAC Address: ");
-  Serial.println(WiFi.macAddress());
-  Serial.print("MQTT Server: ");
-  Serial.print(config.mqttServer);
-  Serial.print(":");
-  Serial.println(config.mqttPort);
-  Serial.println("========================\n");
+  Serial.println();
+  Serial.println("=== SYSTEM INFO ===");
+  Serial.printf("ID: %s\n", config.deviceId);
+  Serial.printf("WiFi: %s | IP: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
+  Serial.printf("MAC: %s\n", WiFi.macAddress().c_str());
+  Serial.printf("MQTT: %s:%d\n", config.mqttServer, config.mqttPort);
+  Serial.printf("Free: %u bytes\n", ESP.getFreeHeap());
+  Serial.println("==================");
 }
 
 // 协议控制函数实现
@@ -657,67 +688,101 @@ bool checkAuthentication() {
 
 // 串口调试心跳函数
 void printDebugHeartbeat() {
+  unsigned long uptime = millis() / 1000;
   Serial.println();
-  Serial.println("=== System Status Heartbeat ===");
-  Serial.print("Uptime: ");
-  Serial.print(millis() / 1000);
-  Serial.println(" seconds");
+  Serial.printf("=== STATUS [%lus] ===\n", uptime);
   
   // WiFi状态
-  Serial.print("WiFi: ");
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("Connected (");
-    Serial.print(WiFi.SSID());
-    Serial.print(", ");
-    Serial.print(WiFi.localIP());
-    Serial.print(", ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm)");
+    Serial.printf("WiFi: %s | %s | %ddBm\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
   } else {
-    Serial.println("Disconnected");
+    Serial.println("WiFi: Disconnected");
   }
   
   // 继电器状态
-  Serial.print("Relay Status: ");
+  Serial.print("Relays: ");
   for (int i = 0; i < 4; i++) {
-    Serial.print("JDQ");
-    Serial.print(i);
-    Serial.print("=");
-    Serial.print(relayStates[i] ? "ON" : "OFF");
-    if (i < 3) Serial.print(", ");
+    Serial.printf("R%d=%s", i+1, relayStates[i] ? "ON" : "OFF");
+    if (i < 3) Serial.print(" | ");
   }
   Serial.println();
-  
-  // Modbus配置
-  Serial.print("Modbus: SlaveID=");
-  Serial.print(config.modbusSlaveId);
-  Serial.print(", RTU_Baud=");
-  Serial.print(config.modbusBaudRate);
-  Serial.print(", TCP_Port=");
-  Serial.print(config.modbusTcpPort);
-  Serial.print(" (");
-  Serial.print(config.modbusTcpEnabled ? "Enabled" : "Disabled");
-  Serial.println(")");
   
   // 内存使用
-  Serial.print("Memory: Free=");
-  Serial.print(ESP.getFreeHeap());
-  Serial.print(" bytes, Usage=");
-  Serial.print(100 - (ESP.getFreeHeap() * 100 / 81920));
-  Serial.println("%");
+  uint32_t freeMem = ESP.getFreeHeap();
+  Serial.printf("Memory: %u bytes (%d%% used)\n", freeMem, 100 - (freeMem * 100 / 81920));
   
   // 服务状态
-  Serial.print("Services: Web=Running");
+  Serial.print("Services: Web=OK");
   if (config.mqttEnabled) {
-    Serial.print(", MQTT=");
-    Serial.print(mqttClient.connected() ? "Connected" : "Disconnected");
+    Serial.printf(" | MQTT=%s", mqttClient.connected() ? "OK" : "ERR");
   }
   if (config.tcpEnabled) {
-    Serial.print(", TCP=Running");
+    Serial.print(" | TCP=OK");
   }
   if (config.modbusTcpEnabled) {
-    Serial.print(", ModbusTCP=Running");
+    Serial.print(" | ModbusTCP=OK");
   }
   Serial.println();
-  Serial.println("===============================");
+  Serial.println("====================");
+}
+
+// 调度重启函数 - 非阻塞式重启
+void scheduleRestart(unsigned long delayMs) {
+  restartScheduledTime = millis() + delayMs;
+  restartScheduled = true;
+  Serial.printf("SYS: Restart in %lums\n", delayMs);
+}
+
+// 系统健康检查函数
+void performHealthCheck() {
+  Serial.println("=== System Health Check ===");
+  
+  // 检查内存使用
+  uint32_t freeHeap = ESP.getFreeHeap();
+  // ESP8266没有getMinFreeHeap()，使用getFreeHeap()
+  
+  Serial.printf("Memory: Free=%u bytes\n", freeHeap);
+  
+  // 内存警告
+  if (freeHeap < 8192) {
+    systemErrorCount++;
+    Serial.println("WARNING: Low memory detected!");
+  }
+  
+  // 检查运行时间
+  unsigned long uptime = (millis() - systemStartTime) / 1000;
+  Serial.printf("Uptime: %lu seconds (%lu hours)\n", uptime, uptime / 3600);
+  
+  // 检查WiFi连接
+  if (WiFi.status() != WL_CONNECTED) {
+    systemErrorCount++;
+    Serial.println("WARNING: WiFi disconnected!");
+  } else {
+    Serial.printf("WiFi: Connected to %s, IP: %s, RSSI: %d dBm\n", 
+                 WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
+  }
+  
+  // 检查MQTT连接（如果启用）
+  if (config.mqttEnabled) {
+    if (!mqttClient.connected()) {
+      systemErrorCount++;
+      Serial.println("WARNING: MQTT disconnected!");
+    } else {
+      Serial.println("MQTT: Connected");
+    }
+  }
+  
+  // 检查错误计数
+  Serial.printf("System error count: %u\n", systemErrorCount);
+  
+  // 如果错误太多，重置错误计数（避免累积）
+  if (systemErrorCount > 100) {
+    Serial.println("Resetting error count (too many errors accumulated)");
+    systemErrorCount = 50; // 部分重置，保留历史记录
+  }
+  
+  // 重置看门狗计时器
+  ESP.wdtFeed();
+  
+  Serial.println("=== Health Check Complete ===");
 }
