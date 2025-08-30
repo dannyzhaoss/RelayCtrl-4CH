@@ -18,36 +18,22 @@ void handleModbus() {
 }
 
 void processModbusRequest() {
-  static uint8_t buffer[256];
+  static uint8_t buffer[64]; // 减少缓冲区大小 - Modbus RTU基本请求不超过64字节
   static int bufferIndex = 0;
   static unsigned long lastReceive = 0;
   
-  while (rs485Serial.available() && bufferIndex < 256) {
+  while (rs485Serial.available() && bufferIndex < sizeof(buffer)) {
     buffer[bufferIndex++] = rs485Serial.read();
     lastReceive = millis();
     
-    // 打印接收到的每个字节用于调试
-    Serial.print("RX byte[");
-    Serial.print(bufferIndex-1);
-    Serial.print("]: 0x");
-    Serial.println(buffer[bufferIndex-1], HEX);
-    
     // 简单的帧检测 - 检查是否收到完整的Modbus帧
     if (bufferIndex >= 8) { // 最小Modbus RTU帧长度
-      Serial.print("Checking frame, length: ");
-      Serial.print(bufferIndex);
-      Serial.print(", slave ID: ");
-      Serial.print(buffer[0]);
-      Serial.print(", config slave ID: ");
-      Serial.println(config.modbusSlaveId);
       
       if (validateModbusFrame(buffer, bufferIndex)) {
-        Serial.println("Frame validated, processing...");
         processModbusFrame(buffer, bufferIndex);
         bufferIndex = 0;
         return; // 立即返回，不等待更多数据
-      } else {
-        Serial.println("Frame validation failed");
+      } else if (bufferIndex >= sizeof(buffer) - 1) {
         // 重要修复：验证失败时清空缓冲区
         bufferIndex = 0;
       }

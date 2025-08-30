@@ -76,40 +76,25 @@ void handleModbusTcpClients() {
 }
 
 void handleModbusTcpRequest(WiFiClient& client) {
-  static uint8_t buffer[260]; // Modbus TCP ADU最大长度
+  static uint8_t buffer[64]; // 减少缓冲区大小 - Modbus基本请求通常不超过64字节
   int bytesRead = 0;
   
-  // 读取Modbus TCP ADU
-  while (client.available() && bytesRead < 260) {
+  // 读取Modbus TCP ADU - 限制最大读取长度
+  while (client.available() && bytesRead < sizeof(buffer)) {
     buffer[bytesRead++] = client.read();
-    
-    // 打印接收到的原始数据
-    Serial.print("TCP RX byte[");
-    Serial.print(bytesRead-1);
-    Serial.print("]: 0x");
-    Serial.println(buffer[bytesRead-1], HEX);
     
     // 检查是否收到完整的MBAP头部
     if (bytesRead >= 6) {
       uint16_t length = (buffer[4] << 8) | buffer[5];
-      Serial.print("TCP Length field: ");
-      Serial.println(length);
+      
+      // 防止长度字段异常大
+      if (length > 250 || length < 1) {
+        Serial.println("Invalid TCP frame length");
+        return;
+      }
       
       if (bytesRead >= length + 6) {
         // 收到完整的Modbus TCP帧
-        Serial.print("Complete TCP frame received, total bytes: ");
-        Serial.println(bytesRead);
-        
-        // 输出完整帧的十六进制
-        Serial.print("Complete frame: ");
-        for (int i = 0; i < bytesRead; i++) {
-          Serial.print("0x");
-          if (buffer[i] < 16) Serial.print("0");
-          Serial.print(buffer[i], HEX);
-          Serial.print(" ");
-        }
-        Serial.println();
-        
         processModbusTcpFrame(client, buffer, bytesRead);
         return;
       }

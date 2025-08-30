@@ -10,7 +10,7 @@ void reconnectMQTT() {
   
   lastMqttReconnect = millis();
   
-  if (mqttClient.connect(dynamicMqttClientId.c_str())) {
+  if (mqttClient.connect(dynamicMqttClientId)) {
     Serial.println("MQTT connected");
     Serial.print("Client ID: ");
     Serial.println(dynamicMqttClientId);
@@ -60,7 +60,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 }
 
 void handleMqttControl(String message) {
-  DynamicJsonDocument doc(256);
+  StaticJsonDocument<128> doc; // 减少JSON缓冲区大小
   deserializeJson(doc, message);
   
   if (doc.containsKey("relay") && doc.containsKey("state")) {
@@ -96,7 +96,7 @@ void handleMqttControl(String message) {
 }
 
 void handleMqttConfig(String message) {
-  DynamicJsonDocument doc(512);
+  StaticJsonDocument<256> doc; // 减少JSON缓冲区大小
   deserializeJson(doc, message);
   
   bool configChanged = false;
@@ -136,7 +136,7 @@ void publishRelayState(int relay, bool state) {
 void publishSystemStatus() {
   if (!mqttClient.connected()) return;
   
-  DynamicJsonDocument doc(512);
+  StaticJsonDocument<384> doc; // 减少JSON缓冲区大小但保持足够容量
   doc["deviceId"] = config.deviceId;
   doc["ip"] = WiFi.localIP().toString();
   doc["wifi"] = WiFi.SSID();

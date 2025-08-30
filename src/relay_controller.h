@@ -33,7 +33,7 @@ struct RelayConfig {
   bool valid;
 };
 
-// 全局变量声明
+// 全局变量声明 - 优化内存使用
 extern bool relayStates[4];
 extern RelayConfig config;
 extern PubSubClient mqttClient;
@@ -42,7 +42,7 @@ extern SoftwareSerial rs485Serial;
 extern ModbusMaster modbus;
 extern unsigned long lastMqttReconnect;
 extern unsigned long lastHeartbeat;
-extern String dynamicMqttClientId;
+extern char dynamicMqttClientId[64];  // 改为char数组
 
 // TCP服务器对象指针
 extern WiFiServer* modbusServer;

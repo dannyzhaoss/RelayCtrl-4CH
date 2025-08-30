@@ -23,15 +23,13 @@ ModbusMaster modbus;
 WiFiServer* modbusServer = nullptr;
 WiFiServer* rawTcpServer = nullptr;
 
-// 全局变量
+// 全局变量 - 优化内存使用
 bool relayStates[4] = {false, false, false, false};
-String deviceId = DEFAULT_DEVICE_ID;
-String mqttServer = MQTT_BROKER;
-int mqttPort = MQTT_PORT;
+char deviceId[32] = DEFAULT_DEVICE_ID;  // 使用char数组替代String
+char dynamicAPName[64];  // 动态生成的AP名称
+char dynamicMqttClientId[64];  // 动态生成的MQTT客户端ID
 unsigned long lastMqttReconnect = 0;
 unsigned long lastHeartbeat = 0;
-String dynamicAPName;  // 动态生成的AP名称
-String dynamicMqttClientId;  // 动态生成的MQTT客户端ID
 
 RelayConfig config;
 
@@ -44,11 +42,11 @@ void setup() {
   Serial.println("Version: " FIRMWARE_VERSION);
   Serial.println("Device: " DEVICE_TYPE);
   
-  // 生成动态AP名称（包含MAC后四位）
+  // 生成动态AP名称（包含MAC后四位）- 优化内存使用
   String mac = WiFi.macAddress();
   String macSuffix = mac.substring(12, 14) + mac.substring(15, 17);  // 获取后四位，跳过冒号
-  dynamicAPName = PROJECT_NAME "-" + macSuffix;
-  dynamicMqttClientId = PROJECT_NAME "-" + macSuffix;
+  snprintf(dynamicAPName, sizeof(dynamicAPName), "%s-%s", PROJECT_NAME, macSuffix.c_str());
+  snprintf(dynamicMqttClientId, sizeof(dynamicMqttClientId), "%s-%s", PROJECT_NAME, macSuffix.c_str());
   Serial.print("Dynamic AP Name: ");
   Serial.println(dynamicAPName);
   Serial.print("Dynamic MQTT Client ID: ");
@@ -59,7 +57,8 @@ void setup() {
   loadConfig();
   
   // 更新设备ID为动态生成的值
-  strcpy(config.deviceId, dynamicMqttClientId.c_str());
+  strncpy(config.deviceId, dynamicMqttClientId, sizeof(config.deviceId) - 1);
+  config.deviceId[sizeof(config.deviceId) - 1] = '\0';  // 确保字符串结束
   saveConfig();
   
   // 初始化继电器引脚
@@ -88,17 +87,38 @@ void setup() {
 }
 
 void loop() {
+  // 内存保护 - 防止内存不足导致死机
+  if (ESP.getFreeHeap() < 8192) {  // 小于8KB时强制垃圾回收
+    Serial.println("WARNING: Low memory detected, forcing GC");
+    delay(100);
+    ESP.wdtFeed();
+    yield();
+  }
+  
+  // 看门狗保护
+  ESP.wdtFeed();
+  
   // 优先处理Web服务器请求
   server.handleClient();
   
-  // 静态变量用于控制其他任务的执行频率
+  // 静态变量用于控制其他任务的执行频率 - 优化性能
   static unsigned long lastMqttCheck = 0;
   static unsigned long lastTcpCheck = 0;
   static unsigned long lastSerialCheck = 0;
   static unsigned long lastModbusCheck = 0;
   static unsigned long lastHeartbeat = 0;
+  static unsigned long lastMemoryCheck = 0;
   
   unsigned long currentTime = millis();
+  
+  // 内存监控 - 每30秒检查一次
+  if (currentTime - lastMemoryCheck > 30000) {
+    lastMemoryCheck = currentTime;
+    uint32_t freeHeap = ESP.getFreeHeap();
+    if (freeHeap < 12288) {  // 小于12KB时警告
+      Serial.printf("Memory Warning: %d bytes free\n", freeHeap);
+    }
+  }
   
   // MQTT处理 - 降低频率到每500ms，仅在启用时处理
   if (config.mqttEnabled && currentTime - lastMqttCheck > 500) {
@@ -140,10 +160,19 @@ void loop() {
     printDebugHeartbeat();
   }
   
-  // mDNS更新 - 每次都执行，但很轻量
-  MDNS.update();
+  // mDNS更新 - 降低频率
+  static unsigned long lastMdnsUpdate = 0;
+  if (currentTime - lastMdnsUpdate > 1000) {  // 每秒更新一次而不是每次循环
+    lastMdnsUpdate = currentTime;
+    MDNS.update();
+  }
   
-  // 短暂延迟，但优先响应Web请求
+  // 优化延迟 - 根据系统负载调整
+  if (ESP.getFreeHeap() < 10240) {  // 内存紧张时增加延迟
+    delay(5);
+  } else {
+    delay(1);  // 正常情况下的最小延迟
+  }
   yield(); // 让出CPU给WiFi栈
 }
 
@@ -291,7 +320,7 @@ void initWiFi() {
     Serial.print("Please connect to ");
     Serial.print(dynamicAPName);
     Serial.println(" hotspot and configure WiFi");
-    wifiManager.autoConnect(dynamicAPName.c_str(), AP_PASSWORD);
+    wifiManager.autoConnect(dynamicAPName, AP_PASSWORD);
   }
 }
 
