@@ -1,6 +1,5 @@
 #include "config.h"
 #include "relay_controller.h"
-#include <Updater.h>
 
 // 将CSS样式存储在Flash中以节省RAM
 const char CSS_STYLES[] PROGMEM = R"(
@@ -479,115 +478,6 @@ void handleConfigPage() {
   html += "</div>";
   html += "</div>";
   
-  // 固件升级卡片
-  html += "<div class=\"card\">";
-  html += "<div class=\"card-title\">固件升级</div>";
-  html += "<div style=\"margin-bottom:15px;color:#666;font-size:14px;\">";
-  html += "当前版本: <strong>" + String(FIRMWARE_VERSION) + "</strong><br>";
-  html += "升级前请确保网络连接稳定，升级过程中请勿断电或重启设备。";
-  html += "</div>";
-  
-  // 固件类型说明
-  html += "<div style=\"background:#f8f9fa;padding:12px;border-radius:4px;margin-bottom:15px;font-size:13px;color:#555;\">";
-  html += "<strong>📖 升级类型说明:</strong><br>";
-  html += "• <strong>Firmware (.bin)</strong>: 主程序固件，包含设备的主要功能代码<br>";
-  html += "• <strong>FileSystem (.bin)</strong>: 文件系统固件，包含网页文件和配置数据<br>";
-  html += "通常只需要升级 Firmware 文件，除非特别说明需要升级 FileSystem。";
-  html += "</div>";
-  
-  // 固件上传表单
-  html += "<form method='POST' action='/upload' enctype='multipart/form-data' id='uploadForm'>";
-  html += "<div class=\"form-group\">";
-  html += "<label class=\"form-label\">选择固件文件 (.bin)</label>";
-  html += "<input type='file' name='firmware' accept='.bin' style='width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;' required>";
-  html += "</div>";
-  html += "<div class=\"form-group\">";
-  html += "<label style='display:flex;align-items:center;'>";
-  html += "<input type='checkbox' id='fsUpload' style='margin-right:8px;'>";
-  html += "<span style='font-size:13px;color:#666;'>勾选此项表示上传的是 FileSystem 固件</span>";
-  html += "</label>";
-  html += "</div>";
-  html += "<div class=\"btn-group\">";
-  html += "<button type='submit' class=\"btn btn-primary\" onclick='return startUpload(event)'>开始升级</button>";
-  html += "</div>";
-  html += "</form>";
-  
-  // 进度显示区域
-  html += "<div id='progressArea' style='display:none;margin-top:15px;'>";
-  html += "<div style='background:#e3f2fd;padding:12px;border-radius:4px;text-align:center;'>";
-  html += "<div style='color:#1976d2;font-weight:500;margin-bottom:8px;'>🔄 正在升级固件...</div>";
-  html += "<div style='background:#fff;border-radius:8px;height:20px;overflow:hidden;margin-bottom:8px;'>";
-  html += "<div id='progressBar' style='height:100%;background:#4caf50;width:0%;transition:width 0.3s;'></div>";
-  html += "</div>";
-  html += "<div id='progressText' style='font-size:12px;color:#666;'>准备上传...</div>";
-  html += "</div>";
-  html += "</div>";
-  
-  html += "<script>";
-  html += "function startUpload(event) {";
-  html += "  event.preventDefault();";
-  html += "  if(!confirm('确定要开始固件升级吗？升级过程中请勿断电或关闭页面！')) return false;";
-  html += "  ";
-  html += "  var formData = new FormData();";
-  html += "  var fileInput = document.querySelector('input[name=\"firmware\"]');";
-  html += "  var file = fileInput.files[0];";
-  html += "  ";
-  html += "  if (!file) {";
-  html += "    alert('请选择固件文件！');";
-  html += "    return false;";
-  html += "  }";
-  html += "  ";
-  html += "  formData.append('firmware', file);";
-  html += "  ";
-  html += "  document.getElementById('progressArea').style.display='block';";
-  html += "  document.getElementById('progressText').textContent = '开始上传...';";
-  html += "  ";
-  html += "  var xhr = new XMLHttpRequest();";
-  html += "  ";
-  html += "  xhr.upload.addEventListener('progress', function(e) {";
-  html += "    if (e.lengthComputable) {";
-  html += "      var percentComplete = (e.loaded / e.total) * 100;";
-  html += "      document.getElementById('progressBar').style.width = percentComplete + '%';";
-  html += "      document.getElementById('progressText').textContent = '上传进度: ' + Math.round(percentComplete) + '%';";
-  html += "    }";
-  html += "  });";
-  html += "  ";
-  html += "  xhr.addEventListener('load', function() {";
-  html += "    if (xhr.status === 200) {";
-  html += "      try {";
-  html += "        var response = JSON.parse(xhr.responseText);";
-  html += "        if (response.status === 'success') {";
-  html += "          document.getElementById('progressBar').style.width = '100%';";
-  html += "          document.getElementById('progressText').textContent = '上传成功，设备正在重启...';";
-  html += "          setTimeout(function() { location.reload(); }, 5000);";
-  html += "        } else {";
-  html += "          alert('上传失败: ' + (response.error || response.message));";
-  html += "          document.getElementById('progressArea').style.display='none';";
-  html += "        }";
-  html += "      } catch(e) {";
-  html += "        alert('服务器响应格式错误');";
-  html += "        document.getElementById('progressArea').style.display='none';";
-  html += "      }";
-  html += "    } else {";
-  html += "      alert('上传失败，HTTP错误: ' + xhr.status);";
-  html += "      document.getElementById('progressArea').style.display='none';";
-  html += "    }";
-  html += "  });";
-  html += "  ";
-  html += "  xhr.addEventListener('error', function() {";
-  html += "    alert('网络错误，上传失败');";
-  html += "    document.getElementById('progressArea').style.display='none';";
-  html += "  });";
-  html += "  ";
-  html += "  xhr.open('POST', '/upload');";
-  html += "  xhr.send(formData);";
-  html += "  ";
-  html += "  return false;";
-  html += "}";
-  html += "</script>";
-  
-  html += "</div>";
-  
   html += "</div></div></body></html>";
   
   server.send(200, "text/html", html);
@@ -743,79 +633,6 @@ void handleNotFound() {
   server.send(404, "text/plain", "找不到页面");
 }
 
-// 固件上传开始处理
-void handleUploadStart() {
-  if (!checkAuthentication()) {
-    return;
-  }
-  
-  server.send(200, "application/json", "{\"status\":\"ready\",\"message\":\"准备接收固件文件\"}");
-}
-
-// 固件上传处理
-void handleUpload() {
-  if (!checkAuthentication()) {
-    return;
-  }
-  
-  HTTPUpload& upload = server.upload();
-  
-  if (upload.status == UPLOAD_FILE_START) {
-    Serial.printf("开始固件上传: %s\n", upload.filename.c_str());
-    
-    // 确定上传类型
-    bool isFileSystem = upload.filename.endsWith(".spiffs.bin") || 
-                       upload.filename.endsWith(".fs.bin") || 
-                       upload.filename.indexOf("spiffs") >= 0 ||
-                       upload.filename.indexOf("filesystem") >= 0;
-    
-    uint32_t maxSketchSpace;
-    if (isFileSystem) {
-      // 文件系统更新
-      maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-      if (!Update.begin(maxSketchSpace, U_FS)) {
-        Update.printError(Serial);
-        return server.send(500, "application/json", "{\"error\":\"文件系统更新初始化失败\"}");
-      }
-    } else {
-      // 固件更新
-      maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-      if (!Update.begin(maxSketchSpace, U_FLASH)) {
-        Update.printError(Serial);
-        return server.send(500, "application/json", "{\"error\":\"固件更新初始化失败\"}");
-      }
-    }
-    
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    // 写入数据
-    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-      Update.printError(Serial);
-      return server.send(500, "application/json", "{\"error\":\"固件写入失败\"}");
-    }
-    
-  } else if (upload.status == UPLOAD_FILE_END) {
-    // 完成上传
-    if (Update.end(true)) {
-      Serial.printf("上传成功: %u bytes\n", upload.totalSize);
-      server.send(200, "application/json", "{\"status\":\"success\",\"message\":\"固件上传成功，设备将重启\"}");
-      delay(1000);
-      ESP.restart();
-    } else {
-      Update.printError(Serial);
-      server.send(500, "application/json", "{\"error\":\"固件更新完成失败\"}");
-    }
-  }
-}
-
-// 固件上传错误处理
-void handleUploadError() {
-  if (!checkAuthentication()) {
-    return;
-  }
-  
-  server.send(500, "application/json", "{\"error\":\"固件上传过程中发生错误\"}");
-}
-
 // 处理API配置请求 (为兼容性保留)
 void handleGetConfig() {
   handleStatus(); // 重定向到状态处理函数
@@ -866,10 +683,6 @@ void initWebServer() {
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handleSetConfig);
   server.on("/api/restart", HTTP_POST, handleRestart);
-  
-  // 固件上传路由
-  server.on("/upload", HTTP_POST, handleUploadStart, handleUpload);
-  server.on("/upload", HTTP_GET, handleUploadStart);
   
   // 404处理
   server.onNotFound(handleNotFound);

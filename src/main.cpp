@@ -72,6 +72,11 @@ void setup() {
   
   // 初始化网络服务
   initWebServer();
+  
+  // 设置Arduino OTA
+  httpUpdater.setup(&server, "/update", config.webUsername, config.webPassword);
+  Serial.println("Arduino OTA initialized at /update");
+  
   initMQTT();
   initModbus();
   initTcpServers();

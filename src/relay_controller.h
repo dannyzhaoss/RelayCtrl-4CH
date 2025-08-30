@@ -57,9 +57,6 @@ void handleGetConfig();
 void handleSetConfig();
 void handleRestart();
 void handleProtocolControl(); // 新增：协议控制处理
-void handleUploadStart();     // 固件上传开始
-void handleUpload();          // 固件上传处理
-void handleUploadError();     // 固件上传错误处理
 
 // MQTT处理函数
 void reconnectMQTT();
